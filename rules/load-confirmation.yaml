@@ -1,0 +1,20 @@
+# rules/load-confirmation.yaml
+# File should print a confirmation message when loaded
+
+name: "Load Confirmation"
+description: "File should print a confirmation message when loaded"
+version: "1.0.0"
+tags: ["quality"]
+
+check:
+  type: "pattern_exists"
+  pattern: "print_call_with_checkmark"
+  value: "checkmark"
+
+error:
+  message: "StructureWarning: Missing load confirmation"
+  fix: "print(\"{module_name} loaded successfully\")"
+
+defaults:
+  severity: "warn"
+  enabled: true

@@ -1,0 +1,156 @@
+# cli/check_types.yaml
+# This file drives the Rule Builder CLI menu.
+# Add a new entry here → it appears in the CLI automatically.
+
+check_types:
+
+  - id: "pattern_exists"
+    label: "Look for a text pattern"
+    description: "Match a string or regex at a specific location in the file"
+    prompts:
+      - field: "pattern"
+        ask: "Pattern to match"
+        type: "text"
+        hint: "e.g. '# TODO', 'if __name__', or a regex"
+      - field: "location"
+        ask: "Where should it look?"
+        type: "choice"
+        options:
+          - value: "first_non_empty_line"
+            label: "First line of the file only"
+          - value: "anywhere"
+            label: "Anywhere in the file"
+          - value: "after_imports"
+            label: "After the import block"
+          - value: "end_of_file"
+            label: "At the end of the file"
+      - field: "required_substrings"
+        ask: "Must the matched block contain specific text? (comma-separated, or leave blank)"
+        type: "text_list"
+        optional: true
+
+  - id: "ast_node_exists"
+    label: "Check for a Python structure"
+    description: "Verify that a specific code structure exists (docstring, import, class)"
+    prompts:
+      - field: "node"
+        ask: "What structure to look for?"
+        type: "choice"
+        options:
+          - value: "module_docstring"
+            label: "Module docstring (text at the top of the file)"
+          - value: "import_statement"
+            label: "Import statement"
+          - value: "class_definition"
+            label: "Class definition"
+          - value: "function_definition"
+            label: "Function definition"
+
+  - id: "ast_check"
+    label: "Check all functions/classes"
+    description: "Run a structural check across every function or class in the file"
+    prompts:
+      - field: "check"
+        ask: "Which check?"
+        type: "choice"
+        options:
+          - value: "all_functions_have_docstrings"
+            label: "Every function has a docstring"
+          - value: "for_loops_without_progress"
+            label: "Loops use progress tracking"
+          - value: "decorated_functions_have_docstrings"
+            label: "Decorated functions have docstrings"
+          - value: "decorated_functions_have_try_except"
+            label: "Decorated functions have error handling"
+      - field: "decorator_pattern"
+        ask: "Which decorators? (comma-separated, e.g. 'app.get, app.post')"
+        type: "text_list"
+        optional: true
+        show_if: "check in ['decorated_functions_have_docstrings', 'decorated_functions_have_try_except']"
+
+  - id: "token_scan"
+    label: "Scan tokens for patterns"
+    description: "Scan the raw code tokens for forbidden values or patterns"
+    prompts:
+      - field: "scan"
+        ask: "What to scan for?"
+        type: "choice"
+        options:
+          - value: "hardcoded_literals"
+            label: "Hardcoded numbers and strings (magic values)"
+          - value: "log_calls_containing"
+            label: "Log/print statements containing forbidden strings"
+      - field: "safe_values"
+        ask: "Values that are OK (comma-separated, e.g. '0, 1, -1')"
+        type: "text_list"
+        optional: true
+        show_if: "scan == 'hardcoded_literals'"
+      - field: "forbidden_strings"
+        ask: "Forbidden strings (comma-separated, e.g. 'ssn, patient_name')"
+        type: "text_list"
+        optional: true
+        show_if: "scan == 'log_calls_containing'"
+
+  - id: "uppercase_assignments_exist"
+    label: "Require named constants"
+    description: "File must have UPPER_SNAKE_CASE constants at the top level"
+    prompts:
+      - field: "min_count"
+        ask: "Minimum number of constants required"
+        type: "number"
+        default: 1
+
+  - id: "docstring_contains"
+    label: "Require docstring sections"
+    description: "The module docstring must contain specific text or section headers"
+    prompts:
+      - field: "value"
+        ask: "Text that must appear in the docstring"
+        type: "text"
+        hint: "e.g. 'MODULE OVERVIEW:', 'PARAMETERS:', 'DEPENDENCIES:'"
+
+  - id: "file_metric"
+    label: "Check file size/complexity"
+    description: "Check numeric properties like line count or function count"
+    prompts:
+      - field: "metric"
+        ask: "What to measure?"
+        type: "choice"
+        options:
+          - value: "line_count"
+            label: "Number of lines"
+          - value: "function_count"
+            label: "Number of functions"
+          - value: "class_count"
+            label: "Number of classes"
+          - value: "import_count"
+            label: "Number of imports"
+      - field: "max_lines"
+        ask: "Maximum allowed"
+        type: "number"
+
+  - id: "custom"
+    label: "Write your own (advanced)"
+    description: "Write a Python expression or point to a plugin file"
+    prompts:
+      - field: "mode"
+        ask: "How do you want to define the check?"
+        type: "choice"
+        options:
+          - value: "expression"
+            label: "Inline Python expression (one-liner)"
+          - value: "plugin"
+            label: "External plugin file (.py)"
+      - field: "expression"
+        ask: "Python expression (receives ast_tree, source_lines, filepath)"
+        type: "text"
+        show_if: "mode == 'expression'"
+      - field: "plugin"
+        ask: "Path to plugin file (relative to $GATE_HOME)"
+        type: "text"
+        show_if: "mode == 'plugin'"
+      - field: "function"
+        ask: "Function name in the plugin file"
+        type: "text"
+        default: "check"
+        show_if: "mode == 'plugin'"

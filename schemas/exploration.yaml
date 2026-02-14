@@ -1,0 +1,17 @@
+# schemas/exploration.yaml
+# Loose rules for scratch scripts and experiments.
+
+schema:
+  name: "exploration"
+  version: "1.0.0"
+  description: "Relaxed rules for notebooks, scratch scripts, experiments"
+
+scope:
+  gated_paths: ["scripts/", "notebooks/"]
+  exempt_paths: []
+
+rules:
+  - id: "no-hardcoded-values"
+    severity: "warn"
+  - id: "function-docstrings"
+    severity: "warn"

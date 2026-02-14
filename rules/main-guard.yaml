@@ -1,0 +1,19 @@
+# rules/main-guard.yaml
+# File must have an if __name__ == '__main__' guard
+
+name: "Main Guard"
+description: "File must have an if __name__ == '__main__' guard"
+version: "1.0.0"
+tags: ["structure"]
+
+check:
+  type: "pattern_exists"
+  pattern: "if_name_main"
+
+error:
+  message: "StructureError: Missing main execution guard"
+  fix: "Add at the bottom of {filename}:\n  if __name__ == \"__main__\":\n      main()"
+
+defaults:
+  severity: "block"
+  enabled: true

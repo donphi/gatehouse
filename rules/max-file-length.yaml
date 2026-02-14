@@ -1,0 +1,21 @@
+# rules/max-file-length.yaml
+# Files must not exceed a maximum line count
+
+name: "Max File Length"
+description: "Files must not exceed a maximum line count"
+version: "1.0.0"
+tags: ["quality"]
+
+check:
+  type: "file_metric"
+  metric: "line_count"
+  max_lines: 1000
+  absolute_max: 1500
+
+error:
+  message: "StructureError: {filename} is {line_count} lines (max: {max_lines})"
+  fix: "Split into focused modules. Each module should do one thing."
+
+defaults:
+  severity: "block"
+  enabled: true

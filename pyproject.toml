@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gatehouse"
+version = "0.1.0"
+description = "Error-driven code schema enforcement for LLMs writing Python"
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+authors = [
+    {name = "Donald Philp", email = "186815007+donphi@users.noreply.github.com"},
+]
+keywords = ["llm", "code-quality", "enforcement", "schema", "python"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+]
+dependencies = [
+    "pyyaml>=6.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/donphi/gatehouse"
+Repository = "https://github.com/donphi/gatehouse"
+Issues = "https://github.com/donphi/gatehouse/issues"
+
+[project.scripts]
+gatehouse = "cli.gatehouse_cli:main"
+
+[tool.setuptools]
+py-modules = ["gate_engine"]
+
+[tool.setuptools.packages.find]
+include = ["cli*", "plugins*"]
+
+[tool.setuptools.package-data]
+"cli" = ["*.yaml", "templates/*.yaml"]
+"*" = ["rules/*.yaml", "schemas/*.yaml"]
+
+[tool.setuptools.data-files]
+"rules" = ["rules/*.yaml"]
+"schemas" = ["schemas/*.yaml"]

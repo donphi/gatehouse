@@ -1,0 +1,18 @@
+# rules/imports-present.yaml
+
+name: "Imports Present"
+description: "File should have import statements"
+version: "1.0.0"
+tags: ["structure"]
+
+check:
+  type: "ast_node_exists"
+  node: "import_statement"
+
+error:
+  message: "StructureWarning: No import statements found in {filename}"
+  fix: "Add the necessary import statements for the modules used in this file"
+
+defaults:
+  severity: "warn"
+  enabled: true

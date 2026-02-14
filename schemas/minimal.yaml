@@ -1,0 +1,16 @@
+# schemas/minimal.yaml
+# The lightest possible schema — just catches hardcoded values.
+
+schema:
+  name: "minimal"
+  version: "1.0.0"
+  description: "Minimal enforcement — hardcoded values only"
+
+scope:
+  gated_paths: ["src/"]
+  exempt_paths: ["tests/"]
+  exempt_files: ["__init__.py"]
+
+rules:
+  - id: "no-hardcoded-values"
+    severity: "warn"

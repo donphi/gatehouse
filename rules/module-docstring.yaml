@@ -1,0 +1,25 @@
+# rules/module-docstring.yaml
+# File must have a module docstring with required sections
+
+name: "Module Docstring"
+description: "File must have a module docstring with required sections"
+version: "1.0.0"
+author: "team"
+tags: ["structure", "documentation"]
+
+check:
+  type: "ast_node_exists"
+  node: "module_docstring"
+  after: "file-header"
+  required_substrings:
+    - "MODULE OVERVIEW:"
+    - "HYPERPARAMETERS:"
+    - "DEPENDENCIES:"
+
+error:
+  message: "StructureError: Missing or incomplete module docstring"
+  fix: "Add a docstring after the header with MODULE OVERVIEW, HYPERPARAMETERS, DEPENDENCIES sections"
+
+defaults:
+  severity: "block"
+  enabled: true

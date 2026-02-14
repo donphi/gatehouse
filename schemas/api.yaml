@@ -1,0 +1,13 @@
+# schemas/api.yaml
+# Everything from production, plus API-specific rules.
+
+schema:
+  name: "api-service"
+  version: "1.0.0"
+  description: "Rules for FastAPI/Flask service files"
+
+extends: "production"
+
+additional_rules:
+  - id: "route-docstrings"
+  - id: "error-handling"

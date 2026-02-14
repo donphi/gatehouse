@@ -1,0 +1,25 @@
+# rules/hyperparameter-block.yaml
+# File must have externalized hyperparameters as UPPER_SNAKE_CASE constants
+
+name: "Hyperparameter Block"
+description: "File must have externalized hyperparameters as UPPER_SNAKE_CASE constants"
+version: "1.0.0"
+tags: ["quality", "config"]
+
+check:
+  type: "uppercase_assignments_exist"
+  min_count: 1
+  location: "module_level"
+
+error:
+  message: "StructureError: No externalized hyperparameters found"
+  fix: |
+    Add at module level, e.g.:
+      CONFIG_PATH = os.environ.get("CONFIG_PATH", "config/pipeline.yaml")
+    or load from config:
+      from lib.config import load_config
+      CONFIG = load_config("config/pipeline.yaml")
+
+defaults:
+  severity: "block"
+  enabled: true

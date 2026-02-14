@@ -1,0 +1,33 @@
+# schemas/production.yaml
+# A strict schema for production source code.
+
+schema:
+  name: "production-ready-python"
+  version: "1.0.0"
+  description: "Full production enforcement for src/ and pipeline/ code"
+
+# Which folders to check and which to skip
+scope:
+  gated_paths: ["src/", "pipeline/"]
+  exempt_paths: ["tests/", "config/"]
+  exempt_files: ["__init__.py", "conftest.py"]
+
+# Which rules to include
+# Each "id" matches a filename in the rules/ directory (without .yaml)
+rules:
+  - id: "file-header"
+  - id: "module-docstring"
+  - id: "no-hardcoded-values"
+  - id: "function-docstrings"
+  - id: "main-guard"
+  - id: "hyperparameter-block"
+  - id: "max-file-length"
+    params:
+      max_lines: 1000
+      absolute_max: 1500
+  - id: "rich-progress"
+    severity: "warn"
+  - id: "load-confirmation"
+    enabled: false
+  - id: "imports-present"
+    severity: "warn"

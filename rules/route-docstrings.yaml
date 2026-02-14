@@ -1,0 +1,19 @@
+# rules/route-docstrings.yaml
+
+name: "Route Docstrings"
+description: "API route handlers must have docstrings"
+version: "1.0.0"
+tags: ["api", "documentation"]
+
+check:
+  type: "ast_check"
+  check: "decorated_functions_have_docstrings"
+  decorator_pattern: ["app.get", "app.post", "app.put", "app.delete"]
+
+error:
+  message: "StructureError: Route handler `{function_name}` at line {line} has no docstring"
+  fix: "Add a docstring to the route handler describing the endpoint, parameters, and response"
+
+defaults:
+  severity: "block"
+  enabled: true

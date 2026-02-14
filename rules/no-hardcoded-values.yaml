@@ -1,0 +1,21 @@
+# rules/no-hardcoded-values.yaml
+# No literal numbers or strings in assignments or function arguments
+
+name: "No Hardcoded Values"
+description: "No literal numbers or strings in assignments or function arguments"
+version: "1.0.0"
+tags: ["quality", "config"]
+
+check:
+  type: "token_scan"
+  scan: "hardcoded_literals"
+  safe_values: [0, 1, -1, "", "None", "True", "False", "__main__"]
+  safe_contexts: ["UPPER_SNAKE_CASE_assignment", "keyword_argument_name"]
+
+error:
+  message: "HardcodedValueError: {value_type} literal `{value}` on line {line}"
+  fix: "{fix_instruction}"
+
+defaults:
+  severity: "block"
+  enabled: true

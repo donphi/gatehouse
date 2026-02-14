@@ -1,0 +1,19 @@
+# rules/error-handling.yaml
+
+name: "Error Handling"
+description: "API route handlers must have error handling"
+version: "1.0.0"
+tags: ["api", "quality"]
+
+check:
+  type: "ast_check"
+  check: "decorated_functions_have_try_except"
+  decorator_pattern: ["app.get", "app.post", "app.put", "app.delete"]
+
+error:
+  message: "StructureError: Route `{function_name}` has no error handling"
+  fix: "Wrap the route handler body in a try/except block with appropriate error responses"
+
+defaults:
+  severity: "block"
+  enabled: true

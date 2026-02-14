@@ -1,0 +1,20 @@
+# rules/rich-progress.yaml
+
+name: "Rich Progress"
+description: "Loops over collections should use progress tracking"
+version: "1.0.0"
+tags: ["quality"]
+
+check:
+  type: "ast_check"
+  check: "for_loops_without_progress"
+
+error:
+  message: "StructureWarning: Loop at line {line} has no progress tracking"
+  fix: |
+    from rich.progress import track
+    for item in track({iterable}, description="{description}"): ...
+
+defaults:
+  severity: "warn"
+  enabled: true

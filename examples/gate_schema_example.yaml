@@ -1,0 +1,28 @@
+# .gate_schema.yaml — Example project configuration
+# Copy this to your project root and customize.
+# Created by running: gatehouse init --schema production
+
+schema: "production"
+
+# Different folders can use different schemas
+overrides:
+  "scripts/explore_*.py":
+    schema: "exploration"
+  "src/api/":
+    schema: "api"
+  "tests/":
+    schema: null                        # Tests are exempt (no checking)
+
+# Override individual rules without changing the schema
+rule_overrides:
+  "load-confirmation":
+    severity: "off"
+  "rich-progress":
+    severity: "block"
+  "max-file-length":
+    params:
+      max_lines: 800
+
+logging:
+  enabled: true
+  directory: "./logs/gate"

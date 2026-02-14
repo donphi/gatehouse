@@ -1,0 +1,23 @@
+# rules/function-docstrings.yaml
+# Every function must have a docstring explaining what it does
+
+name: "Function Docstrings"
+description: "Every function must have a docstring explaining what it does"
+version: "1.0.0"
+tags: ["documentation"]
+
+check:
+  type: "ast_check"
+  check: "all_functions_have_docstrings"
+
+error:
+  message: "StructureError: Function `{function_name}` at line {line} has no docstring"
+  fix: |
+    def {function_name}({params}):
+        """<what this function does>
+        Args: <param descriptions>
+        Returns: <description>"""
+
+defaults:
+  severity: "block"
+  enabled: true

@@ -1,0 +1,10 @@
+include README.md
+include LICENSE
+include python_gate
+
+recursive-include rules *.yaml
+recursive-include schemas *.yaml
+recursive-include cli *.yaml
+recursive-include cli/templates *.yaml
+recursive-include plugins *.py
+recursive-include examples *.py *.json *.yaml

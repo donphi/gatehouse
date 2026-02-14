@@ -1,0 +1,33 @@
+# rules/file-header.yaml
+# File must begin with a standard header block
+
+name: "File Header"
+description: "File must begin with a standard header block"
+version: "1.0.0"
+author: "team"
+tags: ["structure", "documentation"]
+
+check:
+  type: "pattern_exists"
+  pattern: "comment_block_starting_with"
+  value: "# ============"
+  location: "first_non_empty_line"
+  required_substrings:
+    - "FILE: {filename}"
+    - "PURPOSE:"
+
+error:
+  message: "StructureError: Missing standard file header"
+  fix: |
+    Add the following as the first lines of {filepath}:
+
+      # ============================================================================
+      # FILE: {filename}
+      # LOCATION: {directory}/
+      # PIPELINE POSITION: <describe where this fits>
+      # PURPOSE: <one-line description>
+      # ============================================================================
+
+defaults:
+  severity: "block"
+  enabled: true

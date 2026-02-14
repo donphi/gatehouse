@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+# python_gate — pre-execution schema enforcement shim
+# This script intercepts 'python' calls and validates code before running it.
+
+# Where is the real Python interpreter?
+REAL_PYTHON="/usr/bin/python3"
+
+# Where is the gate engine? Uses $GATE_HOME (set in your shell profile).
+GATE_ENGINE="${GATE_HOME}/gate_engine.py"
+
+# Find the .py file in the command arguments
+PY_FILE=""
+for arg in "$@"; do
+    if [[ "$arg" == *.py ]]; then
+        PY_FILE="$arg"
+        break
+    fi
+done
+
+# If no .py file or no gate engine, just run Python normally
+if [[ -z "$PY_FILE" ]] || [[ ! -f "$GATE_ENGINE" ]]; then
+    exec $REAL_PYTHON "$@"
+fi
+
+# Walk up from the .py file's directory looking for .gate_schema.yaml
+# This is how the shim knows which project (and schema) to use
+DIR=$(dirname "$(realpath "$PY_FILE")")
+SCHEMA=""
+while [[ "$DIR" != "/" ]]; do
+    if [[ -f "$DIR/.gate_schema.yaml" ]]; then
+        SCHEMA="$DIR/.gate_schema.yaml"
+        break
+    fi
+    DIR=$(dirname "$DIR")
+done
+
+# No .gate_schema.yaml found? This project isn't gated. Run normally.
+if [[ -z "$SCHEMA" ]]; then
+    exec $REAL_PYTHON "$@"
+fi
+
+# Run the gate engine to check the code
+$REAL_PYTHON "$GATE_ENGINE" --file "$PY_FILE" --schema "$SCHEMA" 2>&1
+GATE_EXIT=$?
+
+# If the gate found violations, stop here (don't run the code)
+if [[ $GATE_EXIT -ne 0 ]]; then
+    exit $GATE_EXIT
+fi
+
+# Gate passed — run the code with real Python
+exec $REAL_PYTHON "$@"
