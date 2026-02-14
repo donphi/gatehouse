@@ -37,7 +37,7 @@ def main():
     Example: Generate a Python file using an LLM, validate it with the gate,
     and loop until it passes.
     """
-    gate_home = os.environ.get("GATE_HOME", os.path.expanduser("~/.python_gate"))
+    gate_home = os.environ.get("GATE_HOME", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
     gate_engine = os.path.join(gate_home, "gate_engine.py")
     schema_path = ".gate_schema.yaml"
 

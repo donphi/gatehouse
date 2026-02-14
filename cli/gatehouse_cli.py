@@ -398,7 +398,7 @@ def cmd_init(args):
             for f in sorted(os.listdir(schemas_dir)):
                 if f.endswith(".yaml"):
                     print(f"  - {f[:-5]}")
-        return
+        sys.exit(1)
 
     config_path = os.path.join(os.getcwd(), ".gate_schema.yaml")
     if os.path.exists(config_path):
@@ -437,10 +437,14 @@ def cmd_list_rules(args):
 
     if args.schema:
         # Show rules in a specific schema
-        schema_data = load_yaml(os.path.join(gate_home, "schemas", f"{args.schema}.yaml"))
+        schema_file = os.path.join(gate_home, "schemas", f"{args.schema}.yaml")
+        if not os.path.isfile(schema_file):
+            print(color(f"Schema '{args.schema}' not found at {schema_file}", "red"))
+            sys.exit(1)
+        schema_data = load_yaml(schema_file)
         if not schema_data:
-            print(color(f"Schema '{args.schema}' not found.", "red"))
-            return
+            print(color(f"Schema '{args.schema}' is empty.", "red"))
+            sys.exit(1)
 
         print(f"\nRules in schema '{args.schema}':")
         print(f"{'─' * 60}")
@@ -502,12 +506,12 @@ def cmd_test_rule(args):
 
     if not os.path.isfile(filepath):
         print(color(f"File not found: {filepath}", "red"))
-        return
+        sys.exit(1)
 
     rule_path = os.path.join(gate_home, "rules", f"{rule_id}.yaml")
     if not os.path.isfile(rule_path):
         print(color(f"Rule not found: {rule_id}", "red"))
-        return
+        sys.exit(1)
 
     # Use gate_engine to test
     import subprocess
@@ -551,6 +555,7 @@ logging:
         else:
             print(color(f"✗ {filepath} violates rule '{rule_id}':", "red"))
             print(result.stderr)
+            sys.exit(result.returncode)
 
     finally:
         os.unlink(temp_schema.name)
@@ -572,7 +577,7 @@ def cmd_disable_rule(args):
     schema_path = os.path.join(gate_home, "schemas", f"{schema_name}.yaml")
     if not os.path.isfile(schema_path):
         print(color(f"Schema '{schema_name}' not found.", "red"))
-        return
+        sys.exit(1)
 
     schema_data = load_yaml(schema_path)
     rules = schema_data.get("rules", [])
@@ -591,7 +596,7 @@ def cmd_disable_rule(args):
 
     if not found:
         print(color(f"Rule '{rule_id}' not found in schema '{schema_name}'.", "red"))
-        return
+        sys.exit(1)
 
     # Write back
     try:
@@ -626,13 +631,26 @@ def cmd_status(args):
     print(f"  {color('GATEHOUSE STATUS', 'bold')}")
     print(f"  {'─' * 56}")
     print(f"  Mode:      {color(mode_labels[mode], mode_colors[mode])}")
-    print(f"  GATE_HOME: {color(gate_home, 'cyan')}")
+    print(f"  Home:      {color(gate_home, 'cyan')} {'(auto-discovered)' if not os.environ.get('GATE_HOME') else '($GATE_HOME)'}")
 
-    # Check if python_gate shim is reachable
+    # Check if python_gate shim is reachable (local or on PATH)
+    import shutil
     shim_path = os.path.join(gate_home, "python_gate")
-    shim_exists = os.path.isfile(shim_path)
-    shim_status = color("found", "green") if shim_exists else color("NOT FOUND", "red")
-    print(f"  Shim:      {shim_status} ({shim_path})")
+    shim_on_path = shutil.which("python_gate")
+    if os.path.isfile(shim_path):
+        print(f"  Shim:      {color('found', 'green')} ({shim_path})")
+    elif shim_on_path:
+        print(f"  Shim:      {color('found', 'green')} ({shim_on_path})")
+    else:
+        print(f"  Shim:      {color('NOT FOUND', 'red')}")
+
+    # Check rules and schemas directories
+    rules_dir = os.path.join(gate_home, "rules")
+    schemas_dir = os.path.join(gate_home, "schemas")
+    rules_ok = os.path.isdir(rules_dir) and any(f.endswith(".yaml") for f in os.listdir(rules_dir))
+    schemas_ok = os.path.isdir(schemas_dir) and any(f.endswith(".yaml") for f in os.listdir(schemas_dir))
+    print(f"  Rules:     {color('found', 'green') if rules_ok else color('NOT FOUND', 'red')} ({rules_dir})")
+    print(f"  Schemas:   {color('found', 'green') if schemas_ok else color('NOT FOUND', 'red')} ({schemas_dir})")
 
     # Check for .gate_schema.yaml in current directory
     schema_path = os.path.join(os.getcwd(), ".gate_schema.yaml")
@@ -654,20 +672,27 @@ def cmd_status(args):
 
 
 def cmd_activate(args):
-    """Print the shell command to activate Gatehouse."""
+    """Print the shell commands to activate Gatehouse."""
     mode = args.mode or "hard"
     if mode not in ("hard", "soft"):
         print(color("  Mode must be 'hard' or 'soft'.", "red"))
-        return
+        sys.exit(1)
 
     gate_home = get_gate_home()
+    shim_path = os.path.join(gate_home, "python_gate")
+
+    # Check if python_gate is on PATH (installed via pip script-files)
+    import shutil
+    shim_on_path = shutil.which("python_gate")
 
     print()
     print(f"  {color('Run these commands in your shell:', 'bold')}")
     print()
-    print(f"    export GATE_HOME=\"{gate_home}\"")
     print(f"    export GATEHOUSE_MODE={mode}")
-    print(f"    alias python=\"$GATE_HOME/python_gate\"")
+    if shim_on_path:
+        print(f"    alias python=\"python_gate\"")
+    else:
+        print(f"    alias python=\"{shim_path}\"")
     print()
 
     mode_desc = {

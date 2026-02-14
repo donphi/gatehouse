@@ -13,6 +13,9 @@ packaging/
 # Logs (generated at runtime)
 logs/
 
+# Fix folder (private build environment)
+fixes/
+
 # Private docs (design notes, publishing guide)
 doc/
 

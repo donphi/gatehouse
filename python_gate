@@ -7,8 +7,11 @@
 #   soft  — print violations but always run (developer visibility)
 #   off   — pass-through, no checking (default when unset)
 
-# Where is the real Python interpreter?
-REAL_PYTHON="/usr/bin/python3"
+# Discover own location — works whether symlinked, aliased, or installed to PATH
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")")" && pwd)"
+
+# Real Python interpreter — found dynamically, never hardcoded
+REAL_PYTHON="$(command -v python3)"
 
 # Enforcement mode: off (default), hard, soft
 MODE="${GATEHOUSE_MODE:-off}"
@@ -21,7 +24,8 @@ if [[ "$MODE" != "hard" && "$MODE" != "soft" ]]; then
     exec $REAL_PYTHON "$@"
 fi
 
-# Where is the gate engine? Uses $GATE_HOME (set in your shell profile).
+# Gate home: self-discovered from script location, with optional override
+GATE_HOME="${GATE_HOME:-$SCRIPT_DIR}"
 GATE_ENGINE="${GATE_HOME}/gate_engine.py"
 
 # Find the .py file in the command arguments

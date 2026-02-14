@@ -34,24 +34,17 @@ Requires Python 3.9+. The only dependency is `pyyaml`.
 Add to your shell profile (`~/.bashrc` or `~/.zshrc`):
 
 ```bash
-export GATE_HOME="$(pip show gatehouse | grep Location | cut -d' ' -f2)"
 export GATEHOUSE_MODE=hard
-alias python="$GATE_HOME/python_gate"
+alias python="python_gate"
 ```
 
-Or if you installed from source:
-
-```bash
-export GATE_HOME="/path/to/gatehouse"
-export GATEHOUSE_MODE=hard
-alias python="$GATE_HOME/python_gate"
-```
-
-Or use the CLI helper to print the commands for you:
+Or use the CLI helper to print the exact commands for you:
 
 ```bash
 gatehouse activate --mode hard
 ```
+
+The shim auto-discovers its own location — no `GATE_HOME` variable needed. If you need to point at a custom rule directory, set `export GATE_HOME="/path/to/rules"` as an optional override.
 
 ### 2. Initialize a project
 
@@ -154,7 +147,7 @@ Every error includes the file, line number, the offending code, what's wrong, an
 
 ## How It Works
 
-Gatehouse intercepts `python` calls at the OS level via a bash shim. The shim checks `$GATEHOUSE_MODE` first — if it's `off` or unset, Python runs normally with zero overhead. In `hard` or `soft` mode, the shim validates the code before execution. The LLM can't bypass it because it doesn't know the shim exists — it only sees the errors.
+Gatehouse intercepts `python` calls at the OS level via a bash shim. The shim checks `$GATEHOUSE_MODE` first — if it's `off` or unset, Python runs normally with zero overhead. In `hard` or `soft` mode, the shim auto-discovers the gate engine and validates the code before execution. The LLM can't bypass it because it doesn't know the shim exists — it only sees the errors.
 
 ---
 
@@ -341,16 +334,11 @@ Gatehouse works in Docker containers with no special configuration. Add to your 
 
 ```dockerfile
 RUN pip install gatehouse
-
-# Set the gate home to the installed package location
-ENV GATE_HOME="/usr/local/lib/python3.11/site-packages"
 ENV GATEHOUSE_MODE=hard
-
-# Replace python with the shim
-RUN ln -sf "$(python3 -c 'import site; print(site.getsitepackages()[0])')/python_gate" /usr/local/bin/python
+RUN ln -sf "$(which python_gate)" /usr/local/bin/python
 ```
 
-No Docker-specific detection is needed. The shim works identically inside and outside containers — it's just a bash script that wraps the Python interpreter.
+After `pip install`, `python_gate` is on `$PATH` and auto-discovers its rules and schemas. No `GATE_HOME` needed. The shim works identically inside and outside containers.
 
 ---
 

@@ -3,9 +3,12 @@
 gate_engine.py — Fixed runtime for error-driven code schema enforcement.
 
 This engine NEVER changes when rules change. All behavior comes from:
-  - Rule YAML files in $GATE_HOME/rules/
-  - Schema manifests in $GATE_HOME/schemas/
+  - Rule YAML files in rules/   (auto-discovered next to this file)
+  - Schema manifests in schemas/ (auto-discovered next to this file)
   - Project config in .gate_schema.yaml
+
+Resource discovery: the engine locates rules/ and schemas/ relative to its
+own file path. Set $GATE_HOME to override (e.g. for a custom rule directory).
 
 Usage:
   python3 gate_engine.py --file src/train.py --schema .gate_schema.yaml
@@ -81,7 +84,8 @@ except ImportError:
 # Constants
 # ---------------------------------------------------------------------------
 
-GATE_HOME = os.environ.get("GATE_HOME", os.path.join(os.path.expanduser("~"), ".python_gate"))
+_PACKAGE_DIR = str(Path(__file__).resolve().parent)
+GATE_HOME = os.environ.get("GATE_HOME", _PACKAGE_DIR)
 
 
 def _read_version():
@@ -103,7 +107,7 @@ VERSION = _read_version()
 # ---------------------------------------------------------------------------
 
 def find_gate_home():
-    """Resolve $GATE_HOME."""
+    """Resolve gate home directory (auto-discovered or $GATE_HOME override)."""
     if os.path.isdir(GATE_HOME):
         return GATE_HOME
     return None
