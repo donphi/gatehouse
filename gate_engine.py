@@ -82,7 +82,20 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 GATE_HOME = os.environ.get("GATE_HOME", os.path.join(os.path.expanduser("~"), ".python_gate"))
-VERSION = "0.1.1"
+
+
+def _read_version():
+    """Read version from pyproject.toml so it is defined in exactly one place."""
+    toml_path = Path(__file__).resolve().parent / "pyproject.toml"
+    if toml_path.is_file():
+        with open(toml_path, "r", encoding="utf-8") as fh:
+            for line in fh:
+                if line.startswith("version"):
+                    return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return "0.0.0"
+
+
+VERSION = _read_version()
 
 
 # ---------------------------------------------------------------------------
