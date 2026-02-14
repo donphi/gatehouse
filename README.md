@@ -35,6 +35,7 @@ Add to your shell profile (`~/.bashrc` or `~/.zshrc`):
 
 ```bash
 export GATE_HOME="$(pip show gatehouse | grep Location | cut -d' ' -f2)"
+export GATEHOUSE_MODE=hard
 alias python="$GATE_HOME/python_gate"
 ```
 
@@ -42,7 +43,14 @@ Or if you installed from source:
 
 ```bash
 export GATE_HOME="/path/to/gatehouse"
+export GATEHOUSE_MODE=hard
 alias python="$GATE_HOME/python_gate"
+```
+
+Or use the CLI helper to print the commands for you:
+
+```bash
+gatehouse activate --mode hard
 ```
 
 ### 2. Initialize a project
@@ -61,6 +69,43 @@ python src/train.py
 ```
 
 If the code violates any rules, Gatehouse blocks execution and prints errors with fix instructions. If it passes, it runs normally.
+
+---
+
+## Enforcement Modes
+
+Gatehouse has three enforcement modes, controlled by a single environment variable:
+
+```bash
+export GATEHOUSE_MODE=hard   # Block execution on violations
+export GATEHOUSE_MODE=soft   # Print violations, always run
+export GATEHOUSE_MODE=off    # Disabled (default when unset)
+```
+
+### hard — LLM enforcement
+
+Violations with severity `block` cause a non-zero exit code. The Python script never runs. The LLM sees the error and must fix it before proceeding. This is the core Gatehouse behavior.
+
+### soft — Developer visibility
+
+The gate engine runs and violations are printed to stderr, but execution always continues (exit code 0). LLMs ignore warnings — they are trained on millions of runs where warnings appeared and the correct action was to skip them. Soft mode is for **you**, the developer: see what the LLM is getting wrong, tune your rules, and switch to hard when ready.
+
+### off — Disabled
+
+The shim passes through to the real Python interpreter immediately. No banner, no checking, zero overhead. This is the default when `$GATEHOUSE_MODE` is unset.
+
+### Activation banner
+
+When the shim is active (hard or soft), it prints a banner to stderr on every Python invocation so you always know enforcement is on:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GATEHOUSE ACTIVE  |  Mode: HARD  |  Schema: production
+  Deactivate: export GATEHOUSE_MODE=off
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+The banner goes to stderr so it never corrupts your program's stdout.
 
 ---
 
@@ -109,7 +154,7 @@ Every error includes the file, line number, the offending code, what's wrong, an
 
 ## How It Works
 
-Gatehouse intercepts every `python` call at the OS level via a bash shim. The LLM can't bypass it because it doesn't know the shim exists — it only sees the errors.
+Gatehouse intercepts `python` calls at the OS level via a bash shim. The shim checks `$GATEHOUSE_MODE` first — if it's `off` or unset, Python runs normally with zero overhead. In `hard` or `soft` mode, the shim validates the code before execution. The LLM can't bypass it because it doesn't know the shim exists — it only sees the errors.
 
 ---
 
@@ -263,6 +308,9 @@ gatehouse list-rules --schema <name>    # List rules in a specific schema
 gatehouse new-rule                      # Create a rule interactively
 gatehouse test-rule <rule> <file>       # Test a rule against a file
 gatehouse disable-rule <rule> --schema <name>  # Disable a rule in a schema
+gatehouse status                        # Show current enforcement mode and config
+gatehouse activate [--mode hard|soft]   # Print shell commands to activate
+gatehouse deactivate                    # Print shell commands to deactivate
 ```
 
 ---
@@ -284,6 +332,25 @@ Every scan is logged to `logs/gate/violations.jsonl` in your project directory. 
 ```
 
 Useful for tracking which rules get violated most, measuring LLM compliance over time, and generating fine-tuning data.
+
+---
+
+## Docker Usage
+
+Gatehouse works in Docker containers with no special configuration. Add to your Dockerfile:
+
+```dockerfile
+RUN pip install gatehouse
+
+# Set the gate home to the installed package location
+ENV GATE_HOME="/usr/local/lib/python3.11/site-packages"
+ENV GATEHOUSE_MODE=hard
+
+# Replace python with the shim
+RUN ln -sf "$(python3 -c 'import site; print(site.getsitepackages()[0])')/python_gate" /usr/local/bin/python
+```
+
+No Docker-specific detection is needed. The shim works identically inside and outside containers — it's just a bash script that wraps the Python interpreter.
 
 ---
 

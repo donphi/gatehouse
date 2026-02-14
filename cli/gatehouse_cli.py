@@ -18,6 +18,9 @@ Usage:
   gatehouse list-rules --schema production
   gatehouse test-rule <rule-id> <file>
   gatehouse disable-rule <rule-id> --schema <schema>
+  gatehouse status
+  gatehouse activate [--mode hard|soft]
+  gatehouse deactivate
 """
 
 import argparse
@@ -52,6 +55,7 @@ COLORS = {
     "cyan": "\033[96m",
     "green": "\033[92m",
     "red": "\033[91m",
+    "yellow": "\033[93m",
     "white": "\033[97m",
     "dim": "\033[2m",
     "bold": "\033[1m",
@@ -600,6 +604,94 @@ def cmd_disable_rule(args):
 
 
 # ---------------------------------------------------------------------------
+# status command
+# ---------------------------------------------------------------------------
+
+def cmd_status(args):
+    """Show current Gatehouse enforcement status."""
+    gate_home = get_gate_home()
+    mode = os.environ.get("GATEHOUSE_MODE", "off").lower()
+
+    if mode not in ("hard", "soft", "off"):
+        mode = "off"
+
+    mode_colors = {"hard": "red", "soft": "yellow", "off": "dim"}
+    mode_labels = {
+        "hard": "HARD — violations block execution (LLM enforcement)",
+        "soft": "SOFT — violations printed, execution continues (developer visibility)",
+        "off": "OFF — shim passes through, no checking",
+    }
+
+    print()
+    print(f"  {color('GATEHOUSE STATUS', 'bold')}")
+    print(f"  {'─' * 56}")
+    print(f"  Mode:      {color(mode_labels[mode], mode_colors[mode])}")
+    print(f"  GATE_HOME: {color(gate_home, 'cyan')}")
+
+    # Check if python_gate shim is reachable
+    shim_path = os.path.join(gate_home, "python_gate")
+    shim_exists = os.path.isfile(shim_path)
+    shim_status = color("found", "green") if shim_exists else color("NOT FOUND", "red")
+    print(f"  Shim:      {shim_status} ({shim_path})")
+
+    # Check for .gate_schema.yaml in current directory
+    schema_path = os.path.join(os.getcwd(), ".gate_schema.yaml")
+    if os.path.isfile(schema_path):
+        project_config = load_yaml(schema_path)
+        schema_name = project_config.get("schema", "unknown")
+        print(f"  Project:   {color(schema_name, 'cyan')} (.gate_schema.yaml found)")
+    else:
+        print(f"  Project:   {color('no .gate_schema.yaml in current directory', 'dim')}")
+
+    print(f"  {'─' * 56}")
+
+    if mode == "off":
+        print(f"  {color('To activate:', 'dim')} export GATEHOUSE_MODE=hard")
+    else:
+        print(f"  {color('To deactivate:', 'dim')} export GATEHOUSE_MODE=off")
+
+    print()
+
+
+def cmd_activate(args):
+    """Print the shell command to activate Gatehouse."""
+    mode = args.mode or "hard"
+    if mode not in ("hard", "soft"):
+        print(color("  Mode must be 'hard' or 'soft'.", "red"))
+        return
+
+    gate_home = get_gate_home()
+
+    print()
+    print(f"  {color('Run these commands in your shell:', 'bold')}")
+    print()
+    print(f"    export GATE_HOME=\"{gate_home}\"")
+    print(f"    export GATEHOUSE_MODE={mode}")
+    print(f"    alias python=\"$GATE_HOME/python_gate\"")
+    print()
+
+    mode_desc = {
+        "hard": "violations will BLOCK execution (LLM enforcement)",
+        "soft": "violations will be PRINTED but execution continues (developer visibility)",
+    }
+    print(f"  {color(mode_desc[mode], 'yellow' if mode == 'soft' else 'red')}")
+    print()
+    print(f"  {color('Add to ~/.bashrc or ~/.zshrc to persist across sessions.', 'dim')}")
+    print()
+
+
+def cmd_deactivate(args):
+    """Print the shell command to deactivate Gatehouse."""
+    print()
+    print(f"  {color('Run this command in your shell:', 'bold')}")
+    print()
+    print(f"    export GATEHOUSE_MODE=off")
+    print()
+    print(f"  {color('The shim will pass through to real Python with zero overhead.', 'dim')}")
+    print()
+
+
+# ---------------------------------------------------------------------------
 # Main CLI entry point
 # ---------------------------------------------------------------------------
 
@@ -631,6 +723,17 @@ def main():
     sub_disable.add_argument("rule_id", help="Rule ID to disable")
     sub_disable.add_argument("--schema", required=True, help="Schema to modify")
 
+    # status
+    subparsers.add_parser("status", help="Show current enforcement status")
+
+    # activate
+    sub_activate = subparsers.add_parser("activate", help="Print shell commands to activate Gatehouse")
+    sub_activate.add_argument("--mode", choices=["hard", "soft"], default="hard",
+                              help="Enforcement mode (default: hard)")
+
+    # deactivate
+    subparsers.add_parser("deactivate", help="Print shell commands to deactivate Gatehouse")
+
     args = parser.parse_args()
 
     if args.command == "new-rule":
@@ -643,6 +746,12 @@ def main():
         cmd_test_rule(args)
     elif args.command == "disable-rule":
         cmd_disable_rule(args)
+    elif args.command == "status":
+        cmd_status(args)
+    elif args.command == "activate":
+        cmd_activate(args)
+    elif args.command == "deactivate":
+        cmd_deactivate(args)
     else:
         parser.print_help()
 

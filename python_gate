@@ -1,9 +1,25 @@
 #!/usr/bin/env bash
 # python_gate — pre-execution schema enforcement shim
 # This script intercepts 'python' calls and validates code before running it.
+#
+# Controlled by $GATEHOUSE_MODE:
+#   hard  — block execution on violations (LLM enforcement)
+#   soft  — print violations but always run (developer visibility)
+#   off   — pass-through, no checking (default when unset)
 
 # Where is the real Python interpreter?
 REAL_PYTHON="/usr/bin/python3"
+
+# Enforcement mode: off (default), hard, soft
+MODE="${GATEHOUSE_MODE:-off}"
+
+# Normalise to lowercase
+MODE=$(echo "$MODE" | tr '[:upper:]' '[:lower:]')
+
+# Off or unset — pass through immediately, zero overhead
+if [[ "$MODE" != "hard" && "$MODE" != "soft" ]]; then
+    exec $REAL_PYTHON "$@"
+fi
 
 # Where is the gate engine? Uses $GATE_HOME (set in your shell profile).
 GATE_ENGINE="${GATE_HOME}/gate_engine.py"
@@ -39,14 +55,48 @@ if [[ -z "$SCHEMA" ]]; then
     exec $REAL_PYTHON "$@"
 fi
 
-# Run the gate engine to check the code
-$REAL_PYTHON "$GATE_ENGINE" --file "$PY_FILE" --schema "$SCHEMA" 2>&1
-GATE_EXIT=$?
+# Read schema name for the banner (best-effort grep from the config)
+SCHEMA_NAME=$(grep -m1 '^schema:' "$SCHEMA" 2>/dev/null | sed 's/schema:[[:space:]]*//' | tr -d '"' | tr -d "'")
+SCHEMA_NAME="${SCHEMA_NAME:-unknown}"
 
-# If the gate found violations, stop here (don't run the code)
-if [[ $GATE_EXIT -ne 0 ]]; then
-    exit $GATE_EXIT
+# Print activation banner to stderr (always visible, never corrupts stdout)
+if [[ "$MODE" == "hard" ]]; then
+    MODE_LABEL="\033[91mHARD\033[0m"
+else
+    MODE_LABEL="\033[93mSOFT\033[0m"
 fi
 
-# Gate passed — run the code with real Python
+{
+    echo -e "\033[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+    echo -e "  \033[1mGATEHOUSE ACTIVE\033[0m  |  Mode: ${MODE_LABEL}  |  Schema: \033[96m${SCHEMA_NAME}\033[0m"
+    echo -e "  \033[2mDeactivate: export GATEHOUSE_MODE=off\033[0m"
+    echo -e "\033[2m━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\033[0m"
+} >&2
+
+# Run the gate engine to check the code
+GATE_OUTPUT=$($REAL_PYTHON "$GATE_ENGINE" --file "$PY_FILE" --schema "$SCHEMA" 2>&1)
+GATE_EXIT=$?
+
+# If violations were found, print the gate output to stderr
+if [[ -n "$GATE_OUTPUT" ]]; then
+    echo "$GATE_OUTPUT" >&2
+fi
+
+# Mode-specific behavior
+if [[ $GATE_EXIT -ne 0 ]]; then
+    if [[ "$MODE" == "hard" ]]; then
+        # Hard mode: block execution — the LLM must fix the code
+        exit $GATE_EXIT
+    else
+        # Soft mode: print a reminder that hard mode would have blocked, then run anyway
+        {
+            echo ""
+            echo -e "  \033[93m▸ Soft mode: execution continues. Hard mode would have BLOCKED.\033[0m"
+            echo -e "  \033[2m  Switch: export GATEHOUSE_MODE=hard\033[0m"
+            echo ""
+        } >&2
+    fi
+fi
+
+# Gate passed (or soft mode) — run the code with real Python
 exec $REAL_PYTHON "$@"

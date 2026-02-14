@@ -82,7 +82,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 GATE_HOME = os.environ.get("GATE_HOME", os.path.join(os.path.expanduser("~"), ".python_gate"))
-VERSION = "1.0.0"
+VERSION = "0.1.1"
 
 
 # ---------------------------------------------------------------------------
