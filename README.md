@@ -6,7 +6,7 @@
 
 **Error-driven code schema enforcement for LLMs writing Python.**
 
-Gatehouse validates Python files against structural rules and blocks non-compliant code before it runs. It's designed for agentic coding environments where LLMs write code — Cursor, Claude Code, Windsurf, Aider, or raw API prompts.
+Gatehouse validates Python files against structural rules and blocks non-compliant code before it runs. It's designed for agentic coding environments where LLMs write code — Cursor, Windsurf, Aider, or raw API prompts.
 
 LLMs are unreliable at following instructions but extremely reliable at fixing errors. Gatehouse exploits this by turning your coding standards into deterministic error messages with exact fix instructions.
 

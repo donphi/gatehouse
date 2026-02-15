@@ -11,14 +11,10 @@ check:
   type: "ast_node_exists"
   node: "module_docstring"
   after: "file-header"
-  required_substrings:
-    - "MODULE OVERVIEW:"
-    - "HYPERPARAMETERS:"
-    - "DEPENDENCIES:"
 
 error:
-  message: "StructureError: Missing or incomplete module docstring"
-  fix: "Add a docstring after the header with MODULE OVERVIEW, HYPERPARAMETERS, DEPENDENCIES sections"
+  message: "StructureError: Missing module docstring"
+  fix: "Add a module-level docstring after the header describing the file's purpose"
 
 defaults:
   severity: "block"

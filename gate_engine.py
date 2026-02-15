@@ -275,7 +275,9 @@ def check_pattern_exists(source, source_lines, filepath, check_config, params):
 
     # Special pattern checks
     if check_config.get("pattern") == "if_name_main":
-        found = any("if __name__" in line and "__main__" in line for line in source_lines)
+        # Only match actual code lines, not comments that mention the pattern
+        code_lines = (line for line in source_lines if not line.strip().startswith("#"))
+        found = any("if __name__" in line and "__main__" in line for line in code_lines)
         if not found:
             violations = [{"line": len(source_lines), "source": ""}]
         else:
@@ -475,9 +477,18 @@ def check_token_scan(source, source_lines, check_config):
                 val = tok.string.strip("'\"")
                 if val in safe_values_str or tok.string in safe_values_str:
                     continue
+                # Skip f-strings — these are display/log text, not config values
+                if "fstring" in safe_contexts:
+                    raw = tok.string.lstrip("bBrRuU")
+                    if raw and raw[0] in ("f", "F"):
+                        continue
                 # Skip docstrings (strings that are the first expression in a function/class/module)
                 if i > 0 and tokens[i - 1].type in (tokenize.NEWLINE, tokenize.NL, tokenize.INDENT):
                     continue
+                # Skip dict keys — string immediately followed by ':'
+                if "dict_key" in safe_contexts:
+                    if i + 1 < len(tokens) and tokens[i + 1].string == ":":
+                        continue
                 # Skip UPPER_SNAKE_CASE assignments
                 if "UPPER_SNAKE_CASE_assignment" in safe_contexts:
                     if i >= 2 and tokens[i - 1].string == "=" and tokens[i - 2].type == tokenize.NAME:

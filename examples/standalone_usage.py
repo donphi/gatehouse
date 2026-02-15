@@ -2,7 +2,7 @@
 Standalone gate usage with any LLM API.
 The gate runs locally. The LLM runs anywhere (API, local, etc.).
 
-This example uses the Anthropic API, but the pattern works with any LLM.
+This example shows the pattern with a placeholder. It works with any LLM API.
 """
 
 import json
@@ -10,7 +10,6 @@ import subprocess
 import os
 
 # Uncomment and install the SDK you want to use:
-# from anthropic import Anthropic
 # from openai import OpenAI
 
 
@@ -96,15 +95,15 @@ class Trainer:
 
         # In a real implementation, you'd feed these errors back to the LLM:
         #
-        # response = client.messages.create(
-        #     model="claude-sonnet-4-20250514",
+        # response = client.chat.completions.create(
+        #     model="gpt-4o",
         #     messages=[
         #         {"role": "user", "content": "Write src/train.py: a training loop"},
         #         {"role": "assistant", "content": f"```python\n{code}\n```"},
         #         {"role": "user", "content": f"Validation failed. Fix ALL errors:\n\n{result.stderr}"}
         #     ]
         # )
-        # code = extract_code_from_response(response.content[0].text)
+        # code = extract_code_from_response(response.choices[0].message.content)
 
         print("  (In production, feed errors back to the LLM and get corrected code)")
         break  # Break here since we don't have a real LLM in this example

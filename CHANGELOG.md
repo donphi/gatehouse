@@ -4,6 +4,21 @@ All notable changes to Gatehouse will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.1.3] - 2026-02-15
+
+### Fixed
+
+- **Critical:** `python_gate` shim now discovers `gate_engine.py` correctly after `pip install` — previously the shim looked in its own directory (`/usr/local/bin/`) instead of site-packages, silently disabling all enforcement
+- `main-guard` rule no longer matches `if __name__` patterns inside comments — files with header comments mentioning the guard were incorrectly passing
+- `no-hardcoded-values` rule no longer flags f-strings, dict keys, or `return 0.0` — these are normal Python patterns, not hardcoded configuration
+- `module-docstring` rule no longer requires undocumented literal sections (`MODULE OVERVIEW:`, `HYPERPARAMETERS:`, `DEPENDENCIES:`) — now checks for docstring existence only
+
+### Changed
+
+- `python_gate` shim uses a three-step discovery chain: `$GATE_HOME` override → script directory (dev install) → Python module import (pip install)
+- `no-hardcoded-values` rule adds `dict_key` and `fstring` safe contexts, and `0.0` to safe values
+- `module-docstring` rule error message simplified to match actual check behavior
+
 ## [0.1.2] - 2026-02-14
 
 ### Fixed

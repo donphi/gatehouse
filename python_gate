@@ -24,8 +24,17 @@ if [[ "$MODE" != "hard" && "$MODE" != "soft" ]]; then
     exec $REAL_PYTHON "$@"
 fi
 
-# Gate home: self-discovered from script location, with optional override
-GATE_HOME="${GATE_HOME:-$SCRIPT_DIR}"
+# Gate home: try explicit override, then script directory, then Python module discovery
+if [[ -n "${GATE_HOME:-}" ]] && [[ -f "${GATE_HOME}/gate_engine.py" ]]; then
+    : # Use explicit GATE_HOME — user override takes priority
+elif [[ -f "${SCRIPT_DIR}/gate_engine.py" ]]; then
+    GATE_HOME="$SCRIPT_DIR"  # Dev / source checkout — engine is next to shim
+else
+    # pip install: gate_engine.py lives in site-packages, not next to the shim.
+    # Ask the same Python interpreter to locate the installed module.
+    GATE_HOME=$($REAL_PYTHON -c "import os, gate_engine; print(os.path.dirname(os.path.abspath(gate_engine.__file__)))" 2>/dev/null)
+fi
+
 GATE_ENGINE="${GATE_HOME}/gate_engine.py"
 
 # Find the .py file in the command arguments
