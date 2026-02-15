@@ -1,0 +1,32 @@
+# cli/theme.yaml
+# Centralised ANSI colour theme for all Gatehouse output.
+# Both gate_engine.py and gatehouse_cli.py load from here.
+# Change colours once, applies everywhere.
+
+ansi:
+  bold: "\033[1m"
+  dim: "\033[2m"
+  reset: "\033[0m"
+  red: "\033[91m"
+  green: "\033[92m"
+  yellow: "\033[93m"
+  cyan: "\033[96m"
+  white: "\033[97m"
+
+# Semantic roles — map to the ANSI names above.
+# Override these to restyle without touching code.
+roles:
+  error: "red"
+  fix: "green"
+  warning: "yellow"
+  info: "cyan"
+  file_path: "dim"
+  caret: "red"
+  summary_bar: "dim"
+  blocked: "red"
+  allowed: "green"
+  title: "cyan"
+  border: "white"
+  prompt: "green"
+  success: "green"
+  hint: "dim"

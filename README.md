@@ -4,11 +4,11 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/gatehouse.svg)](https://pypi.org/project/gatehouse/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Error-driven code schema enforcement for LLMs writing Python.**
+**Error-driven code schema enforcement for Python.**
 
-Gatehouse validates Python files against structural rules and blocks non-compliant code before it runs. It's designed for agentic coding environments where LLMs write code — Cursor, Windsurf, Aider, or raw API prompts.
+Gatehouse validates Python files against structural rules and blocks non-compliant code before it runs. Designed for agentic coding environments where LLMs write code — Cursor, Windsurf, Aider, or raw API prompts.
 
-LLMs are unreliable at following instructions but extremely reliable at fixing errors. Gatehouse exploits this by turning your coding standards into deterministic error messages with exact fix instructions.
+LLMs are unreliable at following instructions but reliable at fixing errors. Gatehouse turns your coding standards into deterministic error messages with exact fix instructions.
 
 ```
 LLM writes code → Gatehouse blocks it → error says exactly what to fix
@@ -23,13 +23,13 @@ LLM writes code → Gatehouse blocks it → error says exactly what to fix
 pip install gatehouse
 ```
 
-Requires Python 3.9+. The only dependency is `pyyaml`.
+Requires Python 3.9+.
 
 ---
 
 ## Quick Start
 
-### 1. Set up the shim
+### 1. Activate Gatehouse
 
 Add to your shell profile (`~/.bashrc` or `~/.zshrc`):
 
@@ -38,13 +38,11 @@ export GATEHOUSE_MODE=hard
 alias python="python_gate"
 ```
 
-Or use the CLI helper to print the exact commands for you:
+Or use the CLI:
 
 ```bash
 gatehouse activate --mode hard
 ```
-
-The shim auto-discovers its own location — no `GATE_HOME` variable needed. If you need to point at a custom rule directory, set `export GATE_HOME="/path/to/rules"` as an optional override.
 
 ### 2. Initialize a project
 
@@ -53,56 +51,19 @@ cd my-project
 gatehouse init --schema production
 ```
 
-This creates a single `.gate_schema.yaml` file in your project. Nothing else is added.
+This creates `.gate_schema.yaml` in your project root. Nothing else.
 
-### 3. Write code normally
+### 3. Run code
 
 ```bash
 python src/train.py
 ```
 
-If the code violates any rules, Gatehouse blocks execution and prints errors with fix instructions. If it passes, it runs normally.
+If violations exist, execution is blocked and errors tell the LLM exactly what to fix. If it passes, the code runs normally.
 
 ---
 
-## Enforcement Modes
-
-Gatehouse has three enforcement modes, controlled by a single environment variable:
-
-```bash
-export GATEHOUSE_MODE=hard   # Block execution on violations
-export GATEHOUSE_MODE=soft   # Print violations, always run
-export GATEHOUSE_MODE=off    # Disabled (default when unset)
-```
-
-### hard — LLM enforcement
-
-Violations with severity `block` cause a non-zero exit code. The Python script never runs. The LLM sees the error and must fix it before proceeding. This is the core Gatehouse behavior.
-
-### soft — Developer visibility
-
-The gate engine runs and violations are printed to stderr, but execution always continues (exit code 0). LLMs ignore warnings — they are trained on millions of runs where warnings appeared and the correct action was to skip them. Soft mode is for **you**, the developer: see what the LLM is getting wrong, tune your rules, and switch to hard when ready.
-
-### off — Disabled
-
-The shim passes through to the real Python interpreter immediately. No banner, no checking, zero overhead. This is the default when `$GATEHOUSE_MODE` is unset.
-
-### Activation banner
-
-When the shim is active (hard or soft), it prints a banner to stderr on every Python invocation so you always know enforcement is on:
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  GATEHOUSE ACTIVE  |  Mode: HARD  |  Schema: production
-  Deactivate: export GATEHOUSE_MODE=off
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-The banner goes to stderr so it never corrupts your program's stdout.
-
----
-
-## What It Does
+## What Happens
 
 Given this code:
 
@@ -119,72 +80,213 @@ Gatehouse blocks it:
 
 ```
   File "src/train.py", line 1
-    import torch
   StructureError: Missing standard file header
-  Fix: Add the following as the first lines of src/train.py:
-
-        # ============================================================================
-        # FILE: train.py
-        # LOCATION: src/
-        # PIPELINE POSITION: <describe where this fits>
-        # PURPOSE: <one-line description>
-        # ============================================================================
 
   File "src/train.py", line 4
         learning_rate = 0.001
                         ^^^^^
   HardcodedValueError: numeric literal `0.001` on line 4
-  Fix: Move to a HYPERPARAMETERS block as LEARNING_RATE = 0.001
+  Fix: Move this literal to a module-level constant or load it from external config
 
-  Schema: production-ready-python (v1.0.0)
   Violations: 6 blocking, 0 warnings
   Execution: BLOCKED
 ```
 
-Every error includes the file, line number, the offending code, what's wrong, and exactly how to fix it. The LLM reads these, fixes the code, and tries again.
+Every error includes the file, line, offending code, what's wrong, and how to fix it.
 
 ---
 
-## How It Works
+## Enforcement Modes
 
-Gatehouse intercepts `python` calls at the OS level via a bash shim. The shim checks `$GATEHOUSE_MODE` first — if it's `off` or unset, Python runs normally with zero overhead. In `hard` or `soft` mode, the shim auto-discovers the gate engine and validates the code before execution. The LLM can't bypass it because it doesn't know the shim exists — it only sees the errors.
+Controlled by a single environment variable:
 
----
-
-## Schemas
-
-Schemas are rule sets. Pick one when initializing a project:
-
-| Schema | Rules | Use Case |
-|--------|-------|----------|
-| `production` | 10 rules, mostly blocking | Production source code |
-| `exploration` | 2 rules, warnings only | Scratch scripts, experiments |
-| `api` | Production + API route rules | FastAPI / Flask services |
-| `minimal` | 1 rule, warning only | Just catch hardcoded values |
+| Mode | Behaviour |
+|------|-----------|
+| `hard` | Block execution on violations. The LLM sees errors and must fix them. |
+| `soft` | Print violations to stderr, always run. For tuning rules before enforcing. |
+| `off` | Pass-through to real Python. Zero overhead. Default when unset. |
 
 ```bash
-gatehouse init --schema exploration
+export GATEHOUSE_MODE=hard
+```
+
+When active, a banner prints to stderr on every invocation:
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  GATEHOUSE ACTIVE  |  Mode: HARD  |  Schema: production
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 ---
 
-## Rules
+## Schemas and Rules
 
-Each rule is a single YAML file. The `production` schema includes:
+Schemas are named rule sets. Pick one when initializing:
 
-| Rule | Checks For | Severity |
-|------|-----------|----------|
+| Schema | Rules | Use Case |
+|--------|-------|----------|
+| `production` | 10 rules, mostly blocking | Production source code |
+| `api` | Production + API route checks | FastAPI / Flask services |
+| `exploration` | 2 rules, warnings only | Scratch scripts, experiments |
+| `minimal` | 1 rule, warning only | Just catch hardcoded values |
+
+The `production` schema includes:
+
+| Rule | What It Checks | Severity |
+|------|---------------|----------|
 | `file-header` | Standard header block at top of file | Block |
-| `module-docstring` | Module docstring with required sections | Block |
-| `no-hardcoded-values` | Magic numbers buried in code | Block |
-| `function-docstrings` | Docstring on every function | Block |
-| `main-guard` | `if __name__ == "__main__":` guard | Block |
-| `hyperparameter-block` | UPPER_SNAKE_CASE constants | Block |
-| `max-file-length` | File length under 1000 lines | Block |
-| `rich-progress` | Progress tracking on loops | Warn |
+| `module-docstring` | Module-level docstring exists | Block |
+| `no-hardcoded-values` | No magic numbers/strings/booleans inside functions | Block |
+| `function-docstrings` | Every function has a docstring | Block |
+| `main-guard` | `if __name__ == "__main__":` guard present | Block |
+| `hyperparameter-block` | UPPER_SNAKE_CASE module-level constants | Block |
+| `max-file-length` | File under 1000 lines | Block |
+| `rich-progress` | Progress tracking on for-loops | Warn |
 | `imports-present` | Import statements exist | Warn |
 
-**Block** = code cannot run. **Warn** = warning shown, code still runs.
+**Block** = code cannot run. **Warn** = warning shown, code runs.
+
+---
+
+## CLI Reference
+
+```bash
+gatehouse init --schema <name>           # Initialize project
+gatehouse activate [--mode hard|soft]    # Print shell activation commands
+gatehouse deactivate                     # Print deactivation commands
+gatehouse status                         # Show mode and config
+gatehouse list-rules                     # List all available rules
+gatehouse list-rules --schema <name>     # List rules in a schema
+gatehouse new-rule                       # Create a rule interactively
+gatehouse test-rule <rule> <file>        # Test a rule against a file
+gatehouse disable-rule <rule> --schema <name>
+```
+
+---
+
+## Standalone Usage (API Integration)
+
+Use Gatehouse programmatically with any LLM API:
+
+```python
+import subprocess
+
+result = subprocess.run(
+    ["python3", "-m", "gate_engine", "--stdin",
+     "--schema", ".gate_schema.yaml",
+     "--filename", "src/train.py"],
+    input=code_from_llm,
+    capture_output=True, text=True
+)
+
+if result.returncode == 0:
+    with open("src/train.py", "w") as f:
+        f.write(code_from_llm)
+else:
+    errors = result.stderr  # Feed back to the LLM
+```
+
+See `examples/standalone_usage.py` for a complete loop.
+
+---
+
+# Advanced
+
+Everything below is for understanding internals, customizing rules, and contributing.
+
+---
+
+## Architecture — Linear Data Flow
+
+Every Python invocation flows through the same linear path:
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│ python_gate  │ ──▶ │ gate_engine  │ ──▶ │SourceAnalyzer│ ──▶ │  Rule YAML   │
+│(interceptor) │     │ (dispatcher) │     │(LibCST parse)│     │(check config)│
+└──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
+       │                    │                    │                    │
+       ▼                    ▼                    ▼                    ▼
+  Intercepts          Loads schema &         One parse.            Each rule
+  `python` calls,     resolves rules,        One tree.             queries the
+  checks mode,        runs each rule         One metadata          analyzer for
+  finds schema        through the            resolve.              its check.
+                      dispatcher             All rules share it.
+```
+
+### Step by step
+
+1. **`python_gate`** intercepts `python` calls at the OS level. Checks `$GATEHOUSE_MODE` — if `off`, passes through immediately. Otherwise finds `.gate_schema.yaml` by walking up from the target file.
+
+2. **`gate_engine.py`** (dispatcher) loads the schema, resolves which rules are active, creates a single `SourceAnalyzer`, and passes it to each rule's check function.
+
+3. **`lib/analyzer.py`** (`SourceAnalyzer`) parses the source once with [LibCST](https://github.com/Instagram/LibCST) and resolves metadata providers (`PositionProvider`, `ParentNodeProvider`). Every rule queries this object — no rule touches raw source text.
+
+4. **`rules/*.yaml`** define what to check. Each YAML file declares a check type, parameters, error message, and fix instruction. The engine maps check types to `SourceAnalyzer` methods internally.
+
+5. **`schemas/*.yaml`** assemble rules into named sets with severity overrides. `.gate_schema.yaml` in the project root selects which schema to use.
+
+### File map
+
+```
+gatehouse/
+├── python_gate              Interceptor — validates before Python runs
+├── gate_engine.py           Dispatcher — loads rules, routes checks, formats output
+├── lib/
+│   └── analyzer.py          SourceAnalyzer — single LibCST parse + metadata
+├── rules/                   One YAML file per rule (12 built-in)
+├── schemas/                 Schema manifests (production, api, exploration, minimal)
+├── cli/
+│   └── gatehouse_cli.py     Interactive CLI for rule management
+├── plugins/                 Custom check plugins (Python files)
+└── examples/                Example configs and usage scripts
+```
+
+---
+
+## How LibCST Powers the Engine
+
+Gatehouse uses [LibCST](https://github.com/Instagram/LibCST) (Meta's Concrete Syntax Tree library for Python) instead of `ast` or `tokenize`. This is a deliberate architectural choice.
+
+### Why not `ast` or `tokenize`?
+
+`ast` discards comments and whitespace. `tokenize` gives raw tokens with no structure. Both require glue code to answer structural questions like "is this literal inside a function body?" or "is this string a docstring?".
+
+LibCST preserves all source detail (comments, whitespace, formatting) while providing a typed tree with parent/child relationships and scope-aware metadata.
+
+### One parse, one resolve
+
+`SourceAnalyzer` creates exactly one parse tree and one metadata resolution per file. All 12 rules query the same object:
+
+```python
+analyzer = SourceAnalyzer(source, filepath)
+
+# Rules call methods like:
+analyzer.has_main_guard()                          # CST If node matching
+analyzer.header_comments()                         # Module.header EmptyLine nodes
+analyzer.literals_in_function_bodies(safe, ctx)    # Scope-aware literal detection
+analyzer.functions_missing_docstrings()            # FunctionDef body inspection
+```
+
+### Metadata providers
+
+The `MetadataWrapper` resolves two providers once, shared by all visitors:
+
+| Provider | What it gives | Used by |
+|----------|---------------|---------|
+| `PositionProvider` | Line/column for any node | All rules (for error reporting) |
+| `ParentNodeProvider` | Parent node of any node | `no-hardcoded-values` (dict context, call argument context, docstring detection) |
+
+### Why this matters for `no-hardcoded-values`
+
+The hardcoded values rule needs to answer: "Is this literal inside a function body, and if so, is it a safe context (dict, call argument, docstring)?"
+
+With `ast`, this required hacking `_parent` attributes onto every node and walking up the chain. With LibCST, `ParentNodeProvider` gives the parent of any node in O(1), and `_func_depth` tracking in the CST visitor handles scope nesting structurally.
+
+Negative numbers like `-1` in CST are `UnaryOperation(Minus, Integer("1"))` — a separate node type that the old `ast`-based code didn't handle. The LibCST implementation unwraps these explicitly, fixing the bug where `safe_values: [-1]` was silently ignored.
+
+Boolean values `True`/`False` are `Name` nodes in CST (not literals), and the type-aware safe value check prevents `True == 1` from colliding with `safe_values: [1]`.
 
 ---
 
@@ -199,29 +301,29 @@ schema: "production"
 
 rule_overrides:
   "main-guard":
-    severity: "off"              # Disable a rule
+    severity: "off"
   "function-docstrings":
-    severity: "warn"             # Downgrade from block to warn
+    severity: "warn"
   "max-file-length":
     params:
-      max_lines: 500             # Make stricter
+      max_lines: 500
 
 overrides:
   "scripts/":
-    schema: "exploration"        # Different schema for a folder
+    schema: "exploration"
   "tests/":
-    schema: null                 # No checking
+    schema: null
 ```
 
 ### Create custom rules
 
-Using the CLI (interactive, no YAML knowledge needed):
+Using the CLI:
 
 ```bash
 gatehouse new-rule
 ```
 
-Or manually — create a YAML file in the `rules/` directory:
+Or manually — create a YAML file in `rules/`:
 
 ```yaml
 # rules/no-todo-comments.yaml
@@ -242,79 +344,37 @@ defaults:
   enabled: true
 ```
 
-Then reference it in a schema:
+Reference it in a schema:
 
 ```yaml
 rules:
   - id: "no-todo-comments"
 ```
 
-### Built-in check types
+### Check types
 
 | Type | What It Does |
 |------|-------------|
-| `pattern_exists` | Match a regex or string at a location |
-| `ast_node_exists` | Check for an AST node (docstring, import, class) |
-| `ast_check` | Parameterized AST checks (all functions have docstrings, etc.) |
-| `token_scan` | Tokenizer-level scan (hardcoded literals, log calls) |
-| `uppercase_assignments_exist` | Module-level constant detection |
-| `docstring_contains` | Required sections in docstrings |
-| `file_metric` | Line count, function count, import count thresholds |
+| `pattern_exists` | Structural CST match (main guard, print call, header block) or string/regex fallback |
+| `ast_node_exists` | Check for module docstring, import statements |
+| `ast_check` | Function docstrings, for-loop progress, decorated function checks |
+| `token_scan` | Scope-aware hardcoded literal detection, log call scanning |
+| `uppercase_assignments_exist` | Module-level UPPER_SNAKE_CASE constant count |
+| `docstring_contains` | Required text in module docstring |
+| `file_metric` | Line count threshold |
 | `custom` | Inline Python expression or external plugin file |
 
----
-
-## Standalone Usage
-
-Use Gatehouse with any LLM API in a validation loop:
-
-```python
-import subprocess
-
-result = subprocess.run(
-    ["python3", "-m", "gate_engine", "--stdin",
-     "--schema", ".gate_schema.yaml",
-     "--filename", "src/train.py"],
-    input=code_from_llm,
-    capture_output=True, text=True
-)
-
-if result.returncode == 0:
-    # Code passed — save it
-    with open("src/train.py", "w") as f:
-        f.write(code_from_llm)
-else:
-    # Code failed — feed errors back to the LLM
-    errors = result.stderr
-```
-
-See `examples/standalone_usage.py` for a complete working example.
-
----
-
-## CLI Reference
-
-```bash
-gatehouse init --schema <name>          # Initialize a project
-gatehouse list-rules                    # List all available rules
-gatehouse list-rules --schema <name>    # List rules in a specific schema
-gatehouse new-rule                      # Create a rule interactively
-gatehouse test-rule <rule> <file>       # Test a rule against a file
-gatehouse disable-rule <rule> --schema <name>  # Disable a rule in a schema
-gatehouse status                        # Show current enforcement mode and config
-gatehouse activate [--mode hard|soft]   # Print shell commands to activate
-gatehouse deactivate                    # Print shell commands to deactivate
-```
+Despite the legacy names (`ast_check`, `token_scan`), all check types use LibCST internally. The names are kept for backward compatibility with existing rule YAML files.
 
 ---
 
 ## Telemetry
 
-Every scan is logged to `logs/gate/violations.jsonl` in your project directory. Each line is a JSON object:
+Scans are logged to `logs/gate/violations.jsonl` (when logging is enabled in `.gate_schema.yaml`):
 
 ```json
 {
-  "timestamp": "2026-02-14T14:57:00Z",
+  "timestamp": "2026-02-15T14:57:00Z",
   "file": "src/train.py",
   "schema": "production",
   "status": "rejected",
@@ -324,13 +384,9 @@ Every scan is logged to `logs/gate/violations.jsonl` in your project directory. 
 }
 ```
 
-Useful for tracking which rules get violated most, measuring LLM compliance over time, and generating fine-tuning data.
-
 ---
 
-## Docker Usage
-
-Gatehouse works in Docker containers with no special configuration. Add to your Dockerfile:
+## Docker
 
 ```dockerfile
 RUN pip install gatehouse
@@ -338,24 +394,7 @@ ENV GATEHOUSE_MODE=hard
 RUN ln -sf "$(which python_gate)" /usr/local/bin/python
 ```
 
-After `pip install`, `python_gate` is on `$PATH` and auto-discovers its rules and schemas. No `GATE_HOME` needed. The shim works identically inside and outside containers.
-
----
-
-## Architecture
-
-```
-gatehouse/
-├── gate_engine.py          # Core engine — fixed runtime, never changes for rule changes
-├── python_gate             # Bash shim — intercepts python calls at OS level
-├── cli/                    # Interactive CLI for rule management
-├── rules/                  # One YAML file per rule (12 built-in)
-├── schemas/                # Schema manifests — assemble rules into sets
-├── plugins/                # Custom check plugins (Python files)
-└── examples/               # Example configs and usage scripts
-```
-
-The engine is fixed. All behavior comes from YAML rule files and schema manifests. Adding a rule means adding a YAML file. Removing a rule means deleting a line from a schema. The engine code never changes.
+LibCST ships pre-built wheels for Linux x86_64, macOS (x86_64 + ARM), and Windows x86_64. If no wheel exists for your platform (e.g. Alpine), the Rust toolchain is required to build from source. Use `python:3.11-slim` or similar as your Docker base.
 
 ---
 

@@ -9,12 +9,18 @@ tags: ["quality", "config"]
 check:
   type: "token_scan"
   scan: "hardcoded_literals"
-  safe_values: [0, 1, -1, 0.0, "", "None", "True", "False", "__main__"]
-  safe_contexts: ["UPPER_SNAKE_CASE_assignment", "keyword_argument_name", "dict_key", "fstring"]
+  # Only these exact values are exempt inside function bodies.
+  # None is always exempt (engine level) — it's absence-of-value, not a value.
+  # 0, 1, -1 are identity/sentinel values — exempt by convention.
+  safe_values: [0, 1, -1, 0.0, ""]
+  # Structural AST contexts (not heuristics — these use the parse tree):
+  # dict_key/dict_value: literals inside dict construction are data structure
+  # call_argument: string literals passed as function args are display text
+  safe_contexts: ["dict_key", "dict_value", "call_argument"]
 
 error:
   message: "HardcodedValueError: {value_type} literal `{value}` on line {line}"
-  fix: "{fix_instruction}"
+  fix: "Move this literal to a module-level constant or load it from external config"
 
 defaults:
   severity: "block"

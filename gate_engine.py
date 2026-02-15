@@ -15,14 +15,11 @@ Usage:
   echo "code" | python3 gate_engine.py --stdin --schema .gate_schema.yaml --filename src/train.py
 """
 
-import ast
-import io
 import json
 import os
 import re
 import sys
 import hashlib
-import tokenize
 import datetime
 from pathlib import Path
 
@@ -86,6 +83,35 @@ except ImportError:
 
 _PACKAGE_DIR = str(Path(__file__).resolve().parent)
 GATE_HOME = os.environ.get("GATE_HOME", _PACKAGE_DIR)
+
+
+def _load_theme():
+    """Load ANSI theme from cli/theme.yaml. Returns resolved role→code mapping."""
+    theme_path = os.path.join(_PACKAGE_DIR, "cli", "theme.yaml")
+    if not os.path.isfile(theme_path):
+        return {}
+    raw = load_yaml(theme_path)
+    if not raw:
+        return {}
+    ansi = raw.get("ansi", {})
+    roles = raw.get("roles", {})
+    resolved = {}
+    for role, color_name in roles.items():
+        resolved[role] = ansi.get(color_name, "")
+    resolved["bold"] = ansi.get("bold", "")
+    resolved["dim"] = ansi.get("dim", "")
+    resolved["reset"] = ansi.get("reset", "")
+    return resolved
+
+
+_THEME = _load_theme()
+
+
+def _c(role: str) -> str:
+    """Return the ANSI code for a semantic role. Empty string if not found or not a TTY."""
+    if not sys.stderr.isatty():
+        return ""
+    return _THEME.get(role, "")
 
 
 def _read_version():
@@ -229,94 +255,81 @@ def apply_project_overrides(rules, project_config):
 
 
 # ---------------------------------------------------------------------------
-# Check type implementations
+# Check type implementations — all use SourceAnalyzer (LibCST)
 # ---------------------------------------------------------------------------
 
-def check_pattern_exists(source, source_lines, filepath, check_config, params):
-    """Check for a text pattern at a location."""
-    pattern = check_config.get("pattern", check_config.get("value", ""))
-    value = check_config.get("value", pattern)
-    location = check_config.get("location", "anywhere")
-    required_substrings = check_config.get("required_substrings", [])
-
+def check_pattern_exists(analyzer, check_config, params):
+    """Check for structural patterns via CST — replaces text scanning."""
+    pattern = check_config.get("pattern", "")
     violations = []
 
-    if location == "first_non_empty_line":
-        first_line = ""
-        first_line_num = 0
-        for i, line in enumerate(source_lines):
-            if line.strip():
-                first_line = line
-                first_line_num = i + 1
-                break
-        if value and value not in first_line:
-            violations.append({
-                "line": first_line_num or 1,
-                "source": first_line.rstrip() if first_line else "",
-            })
-    elif location == "anywhere":
-        found = False
-        for i, line in enumerate(source_lines):
-            if value and value in line:
-                found = True
-                break
-        # Also try regex
-        if not found and value:
-            try:
-                if re.search(value, source):
-                    found = True
-            except re.error:
-                pass
-        if not found:
-            violations.append({"line": 1, "source": source_lines[0].rstrip() if source_lines else ""})
-    elif location == "end_of_file":
-        if source_lines and value not in source_lines[-1]:
-            violations.append({"line": len(source_lines), "source": source_lines[-1].rstrip()})
+    if pattern == "if_name_main":
+        if not analyzer.has_main_guard():
+            violations.append({"line": analyzer.line_count(), "source": ""})
 
-    # Special pattern checks
-    if check_config.get("pattern") == "if_name_main":
-        # Only match actual code lines, not comments that mention the pattern
-        code_lines = (line for line in source_lines if not line.strip().startswith("#"))
-        found = any("if __name__" in line and "__main__" in line for line in code_lines)
-        if not found:
-            violations = [{"line": len(source_lines), "source": ""}]
-        else:
-            violations = []
+    elif pattern == "print_call_with_checkmark":
+        if not analyzer.has_print_call():
+            violations.append({"line": analyzer.line_count(), "source": ""})
 
-    if check_config.get("pattern") == "print_call_with_checkmark":
-        found = any("print(" in line for line in source_lines)
-        if not found:
-            violations = [{"line": len(source_lines), "source": ""}]
-        else:
-            violations = []
+    elif pattern == "comment_block_starting_with":
+        value = check_config.get("value", "")
+        required_substrings = check_config.get("required_substrings", [])
+        header = analyzer.header_comments()
+        header_text = "\n".join(header)
 
-    # Check required_substrings in the header block
-    if not violations and required_substrings:
-        # Check first comment block
-        header_text = ""
-        for line in source_lines:
-            if line.strip().startswith("#") or not line.strip():
-                header_text += line
-            else:
-                break
-        for sub in required_substrings:
-            # Replace template variables for checking
-            clean_sub = sub.split("{")[0] if "{" in sub else sub
-            if clean_sub and clean_sub not in header_text:
+        if value and not any(value in c for c in header):
+            violations.append({"line": 1, "source": ""})
+
+        if not violations and required_substrings:
+            for sub in required_substrings:
+                clean_sub = sub.split("{")[0] if "{" in sub else sub
+                if clean_sub and clean_sub not in header_text:
+                    violations.append({"line": 1, "source": ""})
+                    break
+
+    else:
+        value = check_config.get("value", pattern)
+        location = check_config.get("location", "anywhere")
+        source_lines = analyzer.source_lines
+
+        if location == "first_non_empty_line":
+            first_line = ""
+            first_line_num = 0
+            for i, line in enumerate(source_lines):
+                if line.strip():
+                    first_line = line
+                    first_line_num = i + 1
+                    break
+            if value and value not in first_line:
+                violations.append({
+                    "line": first_line_num or 1,
+                    "source": first_line.rstrip() if first_line else "",
+                })
+        elif location == "anywhere":
+            found = any(value in line for line in source_lines) if value else False
+            if not found and value:
+                try:
+                    if re.search(value, analyzer.source):
+                        found = True
+                except re.error:
+                    pass
+            if not found:
                 violations.append({"line": 1, "source": source_lines[0].rstrip() if source_lines else ""})
-                break
+        elif location == "end_of_file":
+            if source_lines and value not in source_lines[-1]:
+                violations.append({"line": len(source_lines), "source": source_lines[-1].rstrip()})
 
     return violations
 
 
-def check_ast_node_exists(source, ast_tree, check_config):
-    """Check for existence of an AST node type."""
+def check_ast_node_exists(analyzer, check_config):
+    """Check for existence of a structural element via CST."""
     node_type = check_config.get("node", "")
     required_substrings = check_config.get("required_substrings", [])
     violations = []
 
     if node_type == "module_docstring":
-        docstring = ast.get_docstring(ast_tree)
+        docstring = analyzer.get_module_docstring()
         if not docstring:
             violations.append({"line": 1, "source": ""})
         elif required_substrings:
@@ -326,190 +339,49 @@ def check_ast_node_exists(source, ast_tree, check_config):
                     break
 
     elif node_type == "import_statement":
-        has_import = any(
-            isinstance(node, (ast.Import, ast.ImportFrom))
-            for node in ast.walk(ast_tree)
-        )
-        if not has_import:
-            violations.append({"line": 1, "source": ""})
-
-    elif node_type == "class_definition":
-        has_class = any(isinstance(node, ast.ClassDef) for node in ast.walk(ast_tree))
-        if not has_class:
-            violations.append({"line": 1, "source": ""})
-
-    elif node_type == "function_definition":
-        has_func = any(isinstance(node, ast.FunctionDef) for node in ast.walk(ast_tree))
-        if not has_func:
+        if not analyzer.has_import():
             violations.append({"line": 1, "source": ""})
 
     return violations
 
 
-def check_ast_check(source, ast_tree, source_lines, check_config):
-    """Run parameterized AST checks."""
+def check_ast_check(analyzer, check_config):
+    """Run parameterized CST checks."""
     check_name = check_config.get("check", "")
     violations = []
 
     if check_name == "all_functions_have_docstrings":
-        for node in ast.walk(ast_tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                if not ast.get_docstring(node):
-                    args_str = ", ".join(a.arg for a in node.args.args)
-                    violations.append({
-                        "line": node.lineno,
-                        "source": source_lines[node.lineno - 1].rstrip() if node.lineno <= len(source_lines) else "",
-                        "function_name": node.name,
-                        "params": args_str,
-                    })
+        violations = analyzer.functions_missing_docstrings()
 
     elif check_name == "for_loops_without_progress":
-        for node in ast.walk(ast_tree):
-            if isinstance(node, ast.For):
-                # Check if the iterable is wrapped in track() or tqdm()
-                iter_src = ast.dump(node.iter)
-                if "track" not in iter_src and "tqdm" not in iter_src:
-                    violations.append({
-                        "line": node.lineno,
-                        "source": source_lines[node.lineno - 1].rstrip() if node.lineno <= len(source_lines) else "",
-                    })
+        violations = analyzer.for_loops_without_progress()
 
     elif check_name == "decorated_functions_have_docstrings":
         patterns = check_config.get("decorator_pattern", [])
-        for node in ast.walk(ast_tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                for dec in node.decorator_list:
-                    dec_name = _get_decorator_name(dec)
-                    if any(p in dec_name for p in patterns):
-                        if not ast.get_docstring(node):
-                            violations.append({
-                                "line": node.lineno,
-                                "function_name": node.name,
-                            })
+        violations = analyzer.decorated_functions_check(patterns, "docstring")
 
     elif check_name == "decorated_functions_have_try_except":
         patterns = check_config.get("decorator_pattern", [])
-        for node in ast.walk(ast_tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                for dec in node.decorator_list:
-                    dec_name = _get_decorator_name(dec)
-                    if any(p in dec_name for p in patterns):
-                        has_try = any(isinstance(n, ast.Try) for n in ast.walk(node))
-                        if not has_try:
-                            violations.append({
-                                "line": node.lineno,
-                                "function_name": node.name,
-                            })
-
-    elif check_name == "functions_with_param_pattern_have_log_call":
-        param_patterns = check_config.get("param_pattern", [])
-        for node in ast.walk(ast_tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                param_names = [a.arg for a in node.args.args]
-                has_matching_param = any(
-                    any(p in pname for p in param_patterns)
-                    for pname in param_names
-                )
-                if has_matching_param:
-                    # Check for logging call in function body
-                    func_source = ast.dump(node)
-                    has_log = "log" in func_source.lower() or "audit" in func_source.lower()
-                    if not has_log:
-                        violations.append({
-                            "line": node.lineno,
-                            "function_name": node.name,
-                        })
+        violations = analyzer.decorated_functions_check(patterns, "try_except")
 
     return violations
 
 
-def _get_decorator_name(dec):
-    """Extract decorator name as string."""
-    if isinstance(dec, ast.Name):
-        return dec.id
-    elif isinstance(dec, ast.Attribute):
-        parts = []
-        node = dec
-        while isinstance(node, ast.Attribute):
-            parts.append(node.attr)
-            node = node.value
-        if isinstance(node, ast.Name):
-            parts.append(node.id)
-        return ".".join(reversed(parts))
-    elif isinstance(dec, ast.Call):
-        return _get_decorator_name(dec.func)
-    return ""
-
-
-def check_token_scan(source, source_lines, check_config):
-    """Scan tokens for patterns."""
+def check_token_scan(analyzer, check_config):
+    """Scan for hardcoded literals via CST; log scans use source lines."""
     scan_type = check_config.get("scan", "")
     violations = []
 
     if scan_type == "hardcoded_literals":
-        safe_values = check_config.get("safe_values", [0, 1, -1, "", "None", "True", "False", "__main__"])
-        safe_values_str = [str(v) for v in safe_values]
+        safe_values = set()
+        for v in check_config.get("safe_values", []):
+            safe_values.add(v)
         safe_contexts = check_config.get("safe_contexts", [])
-
-        try:
-            tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
-        except tokenize.TokenError:
-            return violations
-
-        for i, tok in enumerate(tokens):
-            if tok.type == tokenize.NUMBER:
-                if tok.string in safe_values_str:
-                    continue
-                # Check if it's an UPPER_SNAKE_CASE assignment
-                if "UPPER_SNAKE_CASE_assignment" in safe_contexts:
-                    if i >= 2 and tokens[i - 1].string == "=" and tokens[i - 2].type == tokenize.NAME:
-                        name = tokens[i - 2].string
-                        if name == name.upper() and "_" in name:
-                            continue
-                violations.append({
-                    "line": tok.start[0],
-                    "source": source_lines[tok.start[0] - 1].rstrip() if tok.start[0] <= len(source_lines) else "",
-                    "value": tok.string,
-                    "value_type": "numeric",
-                })
-
-            elif tok.type == tokenize.STRING:
-                val = tok.string.strip("'\"")
-                if val in safe_values_str or tok.string in safe_values_str:
-                    continue
-                # Skip f-strings — these are display/log text, not config values
-                if "fstring" in safe_contexts:
-                    raw = tok.string.lstrip("bBrRuU")
-                    if raw and raw[0] in ("f", "F"):
-                        continue
-                # Skip docstrings (strings that are the first expression in a function/class/module)
-                if i > 0 and tokens[i - 1].type in (tokenize.NEWLINE, tokenize.NL, tokenize.INDENT):
-                    continue
-                # Skip dict keys — string immediately followed by ':'
-                if "dict_key" in safe_contexts:
-                    if i + 1 < len(tokens) and tokens[i + 1].string == ":":
-                        continue
-                # Skip UPPER_SNAKE_CASE assignments
-                if "UPPER_SNAKE_CASE_assignment" in safe_contexts:
-                    if i >= 2 and tokens[i - 1].string == "=" and tokens[i - 2].type == tokenize.NAME:
-                        name = tokens[i - 2].string
-                        if name == name.upper() and "_" in name:
-                            continue
-                # Skip keyword arguments
-                if "keyword_argument_name" in safe_contexts:
-                    if i >= 2 and tokens[i - 1].string == "=":
-                        continue
-
-                violations.append({
-                    "line": tok.start[0],
-                    "source": source_lines[tok.start[0] - 1].rstrip() if tok.start[0] <= len(source_lines) else "",
-                    "value": val,
-                    "value_type": "string",
-                })
+        violations = analyzer.literals_in_function_bodies(safe_values, safe_contexts)
 
     elif scan_type == "log_calls_containing":
         forbidden = check_config.get("forbidden_strings", [])
-        for i, line in enumerate(source_lines):
+        for i, line in enumerate(analyzer.source_lines):
             lower_line = line.lower()
             if any(kw in lower_line for kw in ["log.", "logging.", "print(", "logger."]):
                 for forbidden_str in forbidden:
@@ -523,45 +395,31 @@ def check_token_scan(source, source_lines, check_config):
     return violations
 
 
-def check_uppercase_assignments(source, ast_tree, check_config):
-    """Check for UPPER_SNAKE_CASE module-level assignments."""
+def check_uppercase_assignments(analyzer, check_config):
+    """Check for uppercase module-level constant assignments via CST."""
     min_count = check_config.get("min_count", 1)
     violations = []
 
-    count = 0
-    for node in ast.iter_child_nodes(ast_tree):
-        if isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    name = target.id
-                    if name == name.upper() and "_" in name and not name.startswith("_"):
-                        count += 1
-
+    count = len(analyzer.module_level_constants())
     if count < min_count:
-        violations.append({
-            "line": 1,
-            "source": "",
-        })
+        violations.append({"line": 1, "source": ""})
 
     return violations
 
 
-def check_docstring_contains(source, ast_tree, check_config):
+def check_docstring_contains(analyzer, check_config):
     """Check that the module docstring contains specific text."""
     value = check_config.get("value", "")
     violations = []
 
-    docstring = ast.get_docstring(ast_tree)
+    docstring = analyzer.get_module_docstring()
     if not docstring or value not in docstring:
-        violations.append({
-            "line": 1,
-            "source": "",
-        })
+        violations.append({"line": 1, "source": ""})
 
     return violations
 
 
-def check_file_metric(source, source_lines, check_config, params):
+def check_file_metric(analyzer, check_config, params):
     """Check file metrics (line count, etc.)."""
     metric = check_config.get("metric", "line_count")
     violations = []
@@ -569,17 +427,18 @@ def check_file_metric(source, source_lines, check_config, params):
     max_val = params.get("max_lines", check_config.get("max_lines", 1000))
 
     if metric == "line_count":
-        if len(source_lines) > max_val:
+        lc = analyzer.line_count()
+        if lc > max_val:
             violations.append({
-                "line": len(source_lines),
+                "line": lc,
                 "source": "",
-                "line_count": len(source_lines),
+                "line_count": lc,
             })
 
     return violations
 
 
-def check_custom(source, ast_tree, source_lines, filepath, check_config):
+def check_custom(analyzer, check_config):
     """Run a custom check (inline expression or plugin)."""
     violations = []
 
@@ -587,14 +446,10 @@ def check_custom(source, ast_tree, source_lines, filepath, check_config):
         expr = check_config["expression"]
         try:
             result = eval(expr, {
-                "ast": ast,
-                "ast_tree": ast_tree,
-                "source_lines": source_lines,
-                "source": source,
-                "filepath": filepath,
-                "tokenize": tokenize,
+                "source_lines": analyzer.source_lines,
+                "source": analyzer.source,
+                "filepath": analyzer.filepath,
                 "re": re,
-                "io": io,
             })
             if result:
                 violations.append({"line": 1, "source": ""})
@@ -612,7 +467,7 @@ def check_custom(source, ast_tree, source_lines, filepath, check_config):
             mod = importlib.util.module_from_spec(spec)
             spec.loader.exec_module(mod)
             func = getattr(mod, func_name)
-            result = func(source, ast_tree, filepath)
+            result = func(analyzer.source, None, analyzer.filepath)
             if isinstance(result, list):
                 violations.extend(result)
         except Exception as e:
@@ -625,9 +480,9 @@ def check_custom(source, ast_tree, source_lines, filepath, check_config):
 # Main check dispatcher
 # ---------------------------------------------------------------------------
 
-def run_check(rule_obj, source, ast_tree, source_lines, filepath):
+def run_check(rule_obj, analyzer):
     """
-    Run a single rule's check against the source code.
+    Run a single rule's check against the SourceAnalyzer.
     Returns a list of violation dicts.
     """
     rule_data = rule_obj["rule_data"]
@@ -636,21 +491,21 @@ def run_check(rule_obj, source, ast_tree, source_lines, filepath):
     check_type = check_config.get("type", "")
 
     if check_type == "pattern_exists":
-        return check_pattern_exists(source, source_lines, filepath, check_config, params)
+        return check_pattern_exists(analyzer, check_config, params)
     elif check_type == "ast_node_exists":
-        return check_ast_node_exists(source, ast_tree, check_config)
+        return check_ast_node_exists(analyzer, check_config)
     elif check_type == "ast_check":
-        return check_ast_check(source, ast_tree, source_lines, check_config)
+        return check_ast_check(analyzer, check_config)
     elif check_type == "token_scan":
-        return check_token_scan(source, source_lines, check_config)
+        return check_token_scan(analyzer, check_config)
     elif check_type == "uppercase_assignments_exist":
-        return check_uppercase_assignments(source, ast_tree, check_config)
+        return check_uppercase_assignments(analyzer, check_config)
     elif check_type == "docstring_contains":
-        return check_docstring_contains(source, ast_tree, check_config)
+        return check_docstring_contains(analyzer, check_config)
     elif check_type == "file_metric":
-        return check_file_metric(source, source_lines, check_config, params)
+        return check_file_metric(analyzer, check_config, params)
     elif check_type == "custom":
-        return check_custom(source, ast_tree, source_lines, filepath, check_config)
+        return check_custom(analyzer, check_config)
     else:
         sys.stderr.write(f"Warning: Unknown check type '{check_type}' in rule '{rule_obj['id']}'\n")
         return []
@@ -660,36 +515,9 @@ def run_check(rule_obj, source, ast_tree, source_lines, filepath):
 # Variable injection
 # ---------------------------------------------------------------------------
 
-def build_variables(filepath, source_lines, ast_tree, extra=None):
-    """Build the variable dict for error template injection."""
-    filename = os.path.basename(filepath)
-    directory = os.path.dirname(filepath)
-    module_name = os.path.splitext(filename)[0]
-
-    variables = {
-        "filename": filename,
-        "filepath": filepath,
-        "directory": directory,
-        "module_name": module_name,
-        "line_count": len(source_lines),
-    }
-
-    # Extract function/class names
-    func_names = []
-    class_names = []
-    for node in ast.walk(ast_tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-            func_names.append(node.name)
-        elif isinstance(node, ast.ClassDef):
-            class_names.append(node.name)
-
-    variables["function_names"] = ", ".join(func_names)
-    variables["class_names"] = ", ".join(class_names)
-
-    if extra:
-        variables.update(extra)
-
-    return variables
+def build_variables(analyzer, extra=None):
+    """Build the variable dict for error template injection via SourceAnalyzer."""
+    return analyzer.build_variables(extra)
 
 
 def inject_variables(template, variables):
@@ -723,19 +551,20 @@ def format_violation_stderr(rule_obj, violation, variables):
     source = violation.get("source", "")
 
     parts = []
-    parts.append(f'  File "{filepath}", line {line}')
+    parts.append(f"  {_c('file_path')}File \"{filepath}\", line {line}{_c('reset')}")
     if source:
         parts.append(f"    {source}")
-        # Caret pointer
         if violation.get("value"):
             val_str = str(violation["value"])
             col = source.find(val_str)
             if col >= 0:
-                parts.append(f"    {' ' * col}{'^' * len(val_str)}")
-    parts.append(f"  {message}")
+                parts.append(f"    {_c('caret')}{' ' * col}{'^' * len(val_str)}{_c('reset')}")
+    parts.append(f"  {_c('error')}{message}{_c('reset')}")
     if fix:
-        for fix_line in fix.strip().splitlines():
-            parts.append(f"  Fix: {fix_line}" if fix_line == fix.strip().splitlines()[0] else f"       {fix_line}")
+        fix_lines = fix.strip().splitlines()
+        parts.append(f"  {_c('fix')}Fix: {fix_lines[0]}{_c('reset')}")
+        for fl in fix_lines[1:]:
+            parts.append(f"  {_c('fix')}     {fl}{_c('reset')}")
 
     return "\n".join(parts)
 
@@ -848,7 +677,7 @@ def is_file_in_scope(filepath, schema_data, project_config):
 # Main scan function
 # ---------------------------------------------------------------------------
 
-def scan_file(source, filepath, schema_path, output_format="stderr"):
+def scan_file(source, filepath, schema_path, output_format="stderr", skip_scope=False):
     """
     Main entry point: scan a Python source string against the schema.
     Returns (exit_code, output_string).
@@ -886,8 +715,8 @@ def scan_file(source, filepath, schema_path, output_format="stderr"):
         sys.stderr.write(f"Warning: Schema '{schema_name}' not found in {gate_home}/schemas/\n")
         return 0, ""
 
-    # Check scope
-    if not is_file_in_scope(filepath, schema_data, project_config):
+    # Check scope (skipped when invoked by python_gate for a specific file)
+    if not skip_scope and not is_file_in_scope(filepath, schema_data, project_config):
         return 0, ""
 
     # Resolve rules
@@ -897,24 +726,22 @@ def scan_file(source, filepath, schema_path, output_format="stderr"):
     # Filter to enabled rules
     active_rules = [r for r in rules if r["enabled"] and r["severity"] != "off"]
 
-    # Parse AST
+    # Parse via LibCST (single parse, single metadata resolve)
     try:
-        ast_tree = ast.parse(source)
-    except SyntaxError as e:
-        # If the code has syntax errors, let Python handle it
+        from lib.analyzer import SourceAnalyzer
+        analyzer = SourceAnalyzer(source, filepath)
+    except SyntaxError:
         return 0, ""
-
-    source_lines = source.splitlines()
 
     # Run all checks
     all_violations = []
     passed_rules = []
     violations_data = []
 
-    variables = build_variables(filepath, source_lines, ast_tree)
+    variables = build_variables(analyzer)
 
     for rule_obj in active_rules:
-        violations = run_check(rule_obj, source, ast_tree, source_lines, filepath)
+        violations = run_check(rule_obj, analyzer)
         if violations:
             all_violations.append((rule_obj, violations))
             for v in violations:
@@ -967,12 +794,15 @@ def scan_file(source, filepath, schema_path, output_format="stderr"):
                 output_parts.append(format_violation_stderr(rule_obj, v, merged))
 
         schema_version = schema_data.get("schema", {}).get("version", "0.0.0")
-        output_parts.append(f"\n  Schema: {schema_name} (v{schema_version})")
-        output_parts.append(f"  Violations: {blocking_count} blocking, {warning_count} warnings")
+        bar = f"{_c('summary_bar')}{'━' * 62}{_c('reset')}"
+        output_parts.append(f"\n{bar}")
+        output_parts.append(f"  {_c('bold')}Schema:{_c('reset')} {_c('info')}{schema_name}{_c('reset')} {_c('dim')}(v{schema_version}){_c('reset')}")
+        output_parts.append(f"  {_c('bold')}Violations:{_c('reset')} {_c('error')}{blocking_count} blocking{_c('reset')}, {_c('warning')}{warning_count} warnings{_c('reset')}")
         if blocking_count > 0:
-            output_parts.append("  Execution: BLOCKED")
+            output_parts.append(f"  {_c('blocked')}{_c('bold')}Execution: BLOCKED{_c('reset')}")
         else:
-            output_parts.append("  Execution: ALLOWED (warnings only)")
+            output_parts.append(f"  {_c('allowed')}Execution: ALLOWED (warnings only){_c('reset')}")
+        output_parts.append(bar)
 
         return (1 if blocking_count > 0 else 0), "\n\n".join(output_parts) + "\n"
 
@@ -990,6 +820,7 @@ def main():
     parser.add_argument("--filename", help="Filename to use when reading from stdin")
     parser.add_argument("--schema", required=True, help="Path to .gate_schema.yaml")
     parser.add_argument("--format", choices=["stderr", "json"], default="stderr", help="Output format")
+    parser.add_argument("--no-scope", action="store_true", help="Skip scope checking (used by python_gate)")
     parser.add_argument("--version", action="version", version=f"gate_engine {VERSION}")
 
     args = parser.parse_args()
@@ -1005,7 +836,7 @@ def main():
         parser.error("Either --file or --stdin is required")
         return
 
-    exit_code, output = scan_file(source, filepath, args.schema, args.format)
+    exit_code, output = scan_file(source, filepath, args.schema, args.format, args.no_scope)
 
     if output:
         sys.stderr.write(output)

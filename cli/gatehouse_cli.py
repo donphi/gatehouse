@@ -48,19 +48,27 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# ANSI color helpers
+# ANSI color helpers — loaded from cli/theme.yaml
 # ---------------------------------------------------------------------------
 
-COLORS = {
-    "cyan": "\033[96m",
-    "green": "\033[92m",
-    "red": "\033[91m",
-    "yellow": "\033[93m",
-    "white": "\033[97m",
-    "dim": "\033[2m",
-    "bold": "\033[1m",
-    "reset": "\033[0m",
-}
+def _load_cli_colors():
+    """Load ANSI codes from theme.yaml. Returns name→code dict."""
+    cli_dir = os.path.dirname(os.path.abspath(__file__))
+    theme_path = os.path.join(cli_dir, "theme.yaml")
+    if not os.path.isfile(theme_path):
+        return {"reset": ""}
+    raw = load_yaml(theme_path)
+    if not raw:
+        return {"reset": ""}
+    ansi = raw.get("ansi", {})
+    roles = raw.get("roles", {})
+    merged = dict(ansi)
+    for role, color_name in roles.items():
+        merged[role] = ansi.get(color_name, "")
+    return merged
+
+
+COLORS = _load_cli_colors()
 
 
 def color(text, color_name):
@@ -68,7 +76,7 @@ def color(text, color_name):
     if not sys.stdout.isatty():
         return text
     code = COLORS.get(color_name, "")
-    return f"{code}{text}{COLORS['reset']}" if code else text
+    return f"{code}{text}{COLORS.get('reset', '')}" if code else text
 
 
 # ---------------------------------------------------------------------------
@@ -624,7 +632,7 @@ def cmd_status(args):
     mode_labels = {
         "hard": "HARD — violations block execution (LLM enforcement)",
         "soft": "SOFT — violations printed, execution continues (developer visibility)",
-        "off": "OFF — shim passes through, no checking",
+        "off": "OFF — pass-through, no checking",
     }
 
     print()
@@ -633,16 +641,16 @@ def cmd_status(args):
     print(f"  Mode:      {color(mode_labels[mode], mode_colors[mode])}")
     print(f"  Home:      {color(gate_home, 'cyan')} {'(auto-discovered)' if not os.environ.get('GATE_HOME') else '($GATE_HOME)'}")
 
-    # Check if python_gate shim is reachable (local or on PATH)
+    # Check if python_gate is reachable (local or on PATH)
     import shutil
-    shim_path = os.path.join(gate_home, "python_gate")
-    shim_on_path = shutil.which("python_gate")
-    if os.path.isfile(shim_path):
-        print(f"  Shim:      {color('found', 'green')} ({shim_path})")
-    elif shim_on_path:
-        print(f"  Shim:      {color('found', 'green')} ({shim_on_path})")
+    gate_path = os.path.join(gate_home, "python_gate")
+    gate_on_path = shutil.which("python_gate")
+    if os.path.isfile(gate_path):
+        print(f"  Gate:      {color('found', 'green')} ({gate_path})")
+    elif gate_on_path:
+        print(f"  Gate:      {color('found', 'green')} ({gate_on_path})")
     else:
-        print(f"  Shim:      {color('NOT FOUND', 'red')}")
+        print(f"  Gate:      {color('NOT FOUND', 'red')}")
 
     # Check rules and schemas directories
     rules_dir = os.path.join(gate_home, "rules")
@@ -679,20 +687,20 @@ def cmd_activate(args):
         sys.exit(1)
 
     gate_home = get_gate_home()
-    shim_path = os.path.join(gate_home, "python_gate")
+    gate_path = os.path.join(gate_home, "python_gate")
 
     # Check if python_gate is on PATH (installed via pip script-files)
     import shutil
-    shim_on_path = shutil.which("python_gate")
+    gate_on_path = shutil.which("python_gate")
 
     print()
     print(f"  {color('Run these commands in your shell:', 'bold')}")
     print()
     print(f"    export GATEHOUSE_MODE={mode}")
-    if shim_on_path:
+    if gate_on_path:
         print(f"    alias python=\"python_gate\"")
     else:
-        print(f"    alias python=\"{shim_path}\"")
+        print(f"    alias python=\"{gate_path}\"")
     print()
 
     mode_desc = {
@@ -712,7 +720,7 @@ def cmd_deactivate(args):
     print()
     print(f"    export GATEHOUSE_MODE=off")
     print()
-    print(f"  {color('The shim will pass through to real Python with zero overhead.', 'dim')}")
+    print(f"  {color('Gatehouse will pass through to real Python with zero overhead.', 'dim')}")
     print()
 
 

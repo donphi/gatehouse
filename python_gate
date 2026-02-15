@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# python_gate — pre-execution schema enforcement shim
+# python_gate — pre-execution schema enforcement interceptor
 # This script intercepts 'python' calls and validates code before running it.
 #
 # Controlled by $GATEHOUSE_MODE:
@@ -28,9 +28,9 @@ fi
 if [[ -n "${GATE_HOME:-}" ]] && [[ -f "${GATE_HOME}/gate_engine.py" ]]; then
     : # Use explicit GATE_HOME — user override takes priority
 elif [[ -f "${SCRIPT_DIR}/gate_engine.py" ]]; then
-    GATE_HOME="$SCRIPT_DIR"  # Dev / source checkout — engine is next to shim
+    GATE_HOME="$SCRIPT_DIR"  # Dev / source checkout — engine is next to interceptor
 else
-    # pip install: gate_engine.py lives in site-packages, not next to the shim.
+    # pip install: gate_engine.py lives in site-packages, not next to python_gate.
     # Ask the same Python interpreter to locate the installed module.
     GATE_HOME=$($REAL_PYTHON -c "import os, gate_engine; print(os.path.dirname(os.path.abspath(gate_engine.__file__)))" 2>/dev/null)
 fi
@@ -52,7 +52,7 @@ if [[ -z "$PY_FILE" ]] || [[ ! -f "$GATE_ENGINE" ]]; then
 fi
 
 # Walk up from the .py file's directory looking for .gate_schema.yaml
-# This is how the shim knows which project (and schema) to use
+# This is how python_gate knows which project (and schema) to use
 DIR=$(dirname "$(realpath "$PY_FILE")")
 SCHEMA=""
 while [[ "$DIR" != "/" ]]; do
@@ -87,7 +87,9 @@ fi
 } >&2
 
 # Run the gate engine to check the code
-GATE_OUTPUT=$($REAL_PYTHON "$GATE_ENGINE" --file "$PY_FILE" --schema "$SCHEMA" 2>&1)
+# --no-scope: python_gate intercepted an explicit python invocation, so skip
+# gated_paths filtering — the user asked to run this file, enforce it.
+GATE_OUTPUT=$($REAL_PYTHON "$GATE_ENGINE" --file "$PY_FILE" --schema "$SCHEMA" --no-scope 2>&1)
 GATE_EXIT=$?
 
 # If violations were found, print the gate output to stderr
