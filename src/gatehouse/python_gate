@@ -49,6 +49,9 @@ case ":${PYTHONPATH:-}:" in
     *) export PYTHONPATH="${_SRC_ROOT}${PYTHONPATH:+:$PYTHONPATH}" ;;
 esac
 
+# We check the file exists to confirm GATE_HOME is valid, but we invoke
+# via -m so that Python resolves the package correctly (__package__ is set,
+# all relative and absolute package imports work reliably).
 GATE_ENGINE="${GATE_HOME}/gate_engine.py"
 
 # Find the .py file in the command arguments
@@ -103,7 +106,7 @@ fi
 # Run the gate engine to check the code
 # --no-scope: python_gate intercepted an explicit python invocation, so skip
 # gated_paths filtering — the user asked to run this file, enforce it.
-GATE_OUTPUT=$($REAL_PYTHON "$GATE_ENGINE" --file "$PY_FILE" --schema "$SCHEMA" --no-scope 2>&1)
+GATE_OUTPUT=$($REAL_PYTHON -m gatehouse.gate_engine --file "$PY_FILE" --schema "$SCHEMA" --no-scope 2>&1)
 GATE_EXIT=$?
 
 # If violations were found, print the gate output to stderr

@@ -4,6 +4,12 @@ All notable changes to Gatehouse will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.2] - 2026-02-15
+
+### Fixed
+
+- **`python_gate` shim failed to enforce rules after src-layout restructuring** — the shim invoked `gate_engine.py` as a direct file (`python /path/to/gate_engine.py`), but after the v0.2.1 restructuring `gate_engine.py` uses package imports (`from gatehouse._paths import ...`) that require proper package context. Running as a file sets `__package__ = None`, causing imports to fail or resolve incorrectly depending on `sys.path` configuration. Fixed by invoking via `python -m gatehouse.gate_engine`, which sets `__package__ = "gatehouse"` and guarantees all package imports resolve correctly.
+
 ## [0.2.1] - 2026-02-15
 
 ### Added
