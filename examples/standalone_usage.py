@@ -5,9 +5,8 @@ The gate runs locally. The LLM runs anywhere (API, local, etc.).
 This example shows the pattern with a placeholder. It works with any LLM API.
 """
 
-import json
-import subprocess
 import os
+import subprocess
 
 # Uncomment and install the SDK you want to use:
 # from openai import OpenAI
@@ -36,8 +35,8 @@ def main():
     Example: Generate a Python file using an LLM, validate it with the gate,
     and loop until it passes.
     """
-    gate_home = os.environ.get("GATE_HOME", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-    gate_engine = os.path.join(gate_home, "gate_engine.py")
+    # Use the installed gatehouse package via python -m
+    gate_engine_module = "gatehouse.gate_engine"
     schema_path = ".gate_schema.yaml"
 
     # Step 1: Load the schema so the LLM knows the rules
@@ -70,9 +69,9 @@ class Trainer:
     for iteration in range(MAX_ITERATIONS):
         print(f"Step {iteration + 2}: Validating with gate engine...")
 
-        # Run gate_engine.py on the code string (stdin)
+        # Run gate_engine module on the code string (stdin)
         result = subprocess.run(
-            ["python3", gate_engine, "--stdin", "--schema", schema_path,
+            ["python3", "-m", gate_engine_module, "--stdin", "--schema", schema_path,
              "--filename", "src/train.py"],
             input=code,
             capture_output=True,

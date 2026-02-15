@@ -4,6 +4,32 @@ All notable changes to Gatehouse will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.2.1] - 2026-02-15
+
+### Added
+
+- `src/gatehouse/_paths.py` — single module for all path resolution; the only file in the codebase that uses `__file__`
+- `src/gatehouse/__init__.py` — defines `__version__` as the single source of truth for the package version
+- `tests/` directory with `__init__.py`
+
+### Changed
+
+- **Restructured to standard Python `src/` layout** — all source code now lives under `src/gatehouse/`
+- All path resolution centralised in `_paths.py` — `gate_engine.py`, `gatehouse_cli.py`, `python_gate`, and `examples/` no longer compute their own paths
+- `gate_engine.py` reads version from `gatehouse.__version__` instead of parsing `pyproject.toml` at runtime
+- `python_gate` discovers the installed package via `import gatehouse.gate_engine` (was `import gate_engine`)
+- `python_gate` adds `src/` to `PYTHONPATH` automatically in dev/source checkouts
+- `pyproject.toml` updated for `src-layout` packaging (`packages.find.where = ["src"]`)
+- `MANIFEST.in` paths updated for new layout
+- CLI `test-rule` invokes engine via `python -m gatehouse.gate_engine` instead of direct file path
+- Standalone usage example uses `-m gatehouse.gate_engine` instead of direct file path
+- README file map updated to reflect new structure
+
+### Removed
+
+- `_read_version()` function from `gate_engine.py` — version now comes from `gatehouse.__version__`
+- All `__file__`-based path computation from `gate_engine.py`, `gatehouse_cli.py`, and `standalone_usage.py`
+
 ## [0.2.0] - 2026-02-15
 
 ### Added

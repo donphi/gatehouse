@@ -6,13 +6,13 @@
 
 **Error-driven code schema enforcement for Python.**
 
-Gatehouse validates Python files against structural rules and blocks non-compliant code before it runs. Designed for agentic coding environments where LLMs write code — Cursor, Windsurf, Aider, or raw API prompts.
+Gatehouse validates Python files against structural rules and blocks non-compliant code before it runs. Designed for agentic coding environments where LLMs write code: Cursor, Windsurf, Aider, or raw API prompts.
 
 LLMs are unreliable at following instructions but reliable at fixing errors. Gatehouse turns your coding standards into deterministic error messages with exact fix instructions.
 
 ```
-LLM writes code → Gatehouse blocks it → error says exactly what to fix
-→ LLM fixes → Gatehouse checks again → compliant code runs
+LLM writes code ▶ Gatehouse blocks it ▶ error says exactly what to fix
+▶ LLM fixes ▶ Gatehouse checks again ▶ compliant code runs
 ```
 
 ---
@@ -173,7 +173,7 @@ Use Gatehouse programmatically with any LLM API:
 import subprocess
 
 result = subprocess.run(
-    ["python3", "-m", "gate_engine", "--stdin",
+    ["python3", "-m", "gatehouse.gate_engine", "--stdin",
      "--schema", ".gate_schema.yaml",
      "--filename", "src/train.py"],
     input=code_from_llm,
@@ -197,7 +197,7 @@ Everything below is for understanding internals, customizing rules, and contribu
 
 ---
 
-## Architecture — Linear Data Flow
+## Architecture: Linear Data Flow
 
 Every Python invocation flows through the same linear path:
 
@@ -230,17 +230,25 @@ Every Python invocation flows through the same linear path:
 ### File map
 
 ```
-gatehouse/
-├── python_gate              Interceptor — validates before Python runs
-├── gate_engine.py           Dispatcher — loads rules, routes checks, formats output
-├── lib/
-│   └── analyzer.py          SourceAnalyzer — single LibCST parse + metadata
-├── rules/                   One YAML file per rule (12 built-in)
-├── schemas/                 Schema manifests (production, api, exploration, minimal)
-├── cli/
-│   └── gatehouse_cli.py     Interactive CLI for rule management
-├── plugins/                 Custom check plugins (Python files)
-└── examples/                Example configs and usage scripts
+gatehouse/                       (repo root)
+├── src/
+│   └── gatehouse/
+│       ├── __init__.py          Package root — defines __version__
+│       ├── _paths.py            SINGLE source of truth for ALL path resolution
+│       ├── gate_engine.py       Dispatcher — loads rules, routes checks, formats output
+│       ├── python_gate          Interceptor — validates before Python runs
+│       ├── lib/
+│       │   └── analyzer.py      SourceAnalyzer — single LibCST parse + metadata
+│       ├── rules/               One YAML file per rule (12 built-in)
+│       ├── schemas/             Schema manifests (production, api, exploration, minimal)
+│       ├── cli/
+│       │   └── gatehouse_cli.py Interactive CLI for rule management
+│       └── plugins/             Custom check plugins (Python files)
+├── tests/                       Test suite
+├── examples/                    Example configs and usage scripts
+├── pyproject.toml
+├── README.md
+└── LICENSE
 ```
 
 ---

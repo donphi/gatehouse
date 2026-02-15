@@ -3,25 +3,27 @@
 gate_engine.py — Fixed runtime for error-driven code schema enforcement.
 
 This engine NEVER changes when rules change. All behavior comes from:
-  - Rule YAML files in rules/   (auto-discovered next to this file)
-  - Schema manifests in schemas/ (auto-discovered next to this file)
+  - Rule YAML files in rules/   (discovered via gatehouse._paths)
+  - Schema manifests in schemas/ (discovered via gatehouse._paths)
   - Project config in .gate_schema.yaml
 
-Resource discovery: the engine locates rules/ and schemas/ relative to its
-own file path. Set $GATE_HOME to override (e.g. for a custom rule directory).
+Resource discovery: all paths are resolved through gatehouse._paths, which
+auto-discovers the package directory. Set $GATE_HOME to override.
 
 Usage:
-  python3 gate_engine.py --file src/train.py --schema .gate_schema.yaml
-  echo "code" | python3 gate_engine.py --stdin --schema .gate_schema.yaml --filename src/train.py
+  python3 -m gatehouse.gate_engine --file src/train.py --schema .gate_schema.yaml
+  echo "code" | python3 -m gatehouse.gate_engine --stdin --schema .gate_schema.yaml --filename src/train.py
 """
 
+import datetime
+import hashlib
 import json
 import os
 import re
 import sys
-import hashlib
-import datetime
-from pathlib import Path
+
+from gatehouse import __version__ as VERSION
+from gatehouse._paths import get_gate_home, plugins_dir, rules_dir, schemas_dir, theme_path
 
 # ---------------------------------------------------------------------------
 # YAML loader (minimal, no external dependency)
@@ -78,19 +80,16 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# Constants
+# Theme / colour helpers
 # ---------------------------------------------------------------------------
 
-_PACKAGE_DIR = str(Path(__file__).resolve().parent)
-GATE_HOME = os.environ.get("GATE_HOME", _PACKAGE_DIR)
 
-
-def _load_theme():
+def _load_theme() -> dict:
     """Load ANSI theme from cli/theme.yaml. Returns resolved role→code mapping."""
-    theme_path = os.path.join(_PACKAGE_DIR, "cli", "theme.yaml")
-    if not os.path.isfile(theme_path):
+    tp = theme_path()
+    if not tp.is_file():
         return {}
-    raw = load_yaml(theme_path)
+    raw = load_yaml(str(tp))
     if not raw:
         return {}
     ansi = raw.get("ansi", {})
@@ -114,45 +113,32 @@ def _c(role: str) -> str:
     return _THEME.get(role, "")
 
 
-def _read_version():
-    """Read version from pyproject.toml so it is defined in exactly one place."""
-    toml_path = Path(__file__).resolve().parent / "pyproject.toml"
-    if toml_path.is_file():
-        with open(toml_path, "r", encoding="utf-8") as fh:
-            for line in fh:
-                if line.startswith("version"):
-                    return line.split("=", 1)[1].strip().strip('"').strip("'")
-    return "0.0.0"
-
-
-VERSION = _read_version()
-
-
 # ---------------------------------------------------------------------------
 # Rule loading
 # ---------------------------------------------------------------------------
 
-def find_gate_home():
+def find_gate_home() -> str | None:
     """Resolve gate home directory (auto-discovered or $GATE_HOME override)."""
-    if os.path.isdir(GATE_HOME):
-        return GATE_HOME
+    home = get_gate_home()
+    if home.is_dir():
+        return str(home)
     return None
 
 
-def load_rule(rule_id, gate_home):
+def load_rule(rule_id: str, gate_home: str) -> dict | None:
     """Load a single rule YAML file by ID."""
-    rule_path = os.path.join(gate_home, "rules", f"{rule_id}.yaml")
-    if not os.path.isfile(rule_path):
+    rule_path = rules_dir(None) / f"{rule_id}.yaml"
+    if not rule_path.is_file():
         return None
-    return load_yaml(rule_path)
+    return load_yaml(str(rule_path))
 
 
-def load_schema(schema_name, gate_home):
+def load_schema(schema_name: str, gate_home: str) -> dict | None:
     """Load a schema manifest by name."""
-    schema_path = os.path.join(gate_home, "schemas", f"{schema_name}.yaml")
-    if not os.path.isfile(schema_path):
+    schema_path = schemas_dir(None) / f"{schema_name}.yaml"
+    if not schema_path.is_file():
         return None
-    return load_yaml(schema_path)
+    return load_yaml(str(schema_path))
 
 
 def resolve_rules(schema_data, gate_home):
@@ -181,7 +167,7 @@ def resolve_rules(schema_data, gate_home):
 
             rule_data = load_rule(rule_id, gate_home)
             if not rule_data:
-                sys.stderr.write(f"Warning: Rule '{rule_id}' not found in {gate_home}/rules/\n")
+                sys.stderr.write(f"Warning: Rule '{rule_id}' not found in {rules_dir()}\n")
                 continue
 
             # Apply overrides from schema
@@ -214,7 +200,7 @@ def resolve_rules(schema_data, gate_home):
             continue
         rule_data = load_rule(rule_id, gate_home)
         if not rule_data:
-            sys.stderr.write(f"Warning: Rule '{rule_id}' not found in {gate_home}/rules/\n")
+            sys.stderr.write(f"Warning: Rule '{rule_id}' not found in {rules_dir()}\n")
             continue
         defaults = rule_data.get("defaults", {})
         rule_obj = {
@@ -459,7 +445,7 @@ def check_custom(analyzer, check_config):
     elif "plugin" in check_config:
         plugin_path = check_config["plugin"]
         if not os.path.isabs(plugin_path):
-            plugin_path = os.path.join(GATE_HOME, plugin_path)
+            plugin_path = str(plugins_dir() / os.path.basename(plugin_path))
         func_name = check_config.get("function", "check")
         try:
             import importlib.util
@@ -712,7 +698,7 @@ def scan_file(source, filepath, schema_path, output_format="stderr", skip_scope=
     # Load schema
     schema_data = load_schema(schema_name, gate_home)
     if not schema_data:
-        sys.stderr.write(f"Warning: Schema '{schema_name}' not found in {gate_home}/schemas/\n")
+        sys.stderr.write(f"Warning: Schema '{schema_name}' not found in {schemas_dir()}\n")
         return 0, ""
 
     # Check scope (skipped when invoked by python_gate for a specific file)
@@ -727,11 +713,16 @@ def scan_file(source, filepath, schema_path, output_format="stderr", skip_scope=
     active_rules = [r for r in rules if r["enabled"] and r["severity"] != "off"]
 
     # Parse via LibCST (single parse, single metadata resolve)
+    # NOTE: libcst.ParserSyntaxError does NOT inherit from SyntaxError.
+    # We catch Exception here so that a parse failure never silently approves
+    # a file.  A file that cannot be parsed is treated as a blocking error.
     try:
-        from lib.analyzer import SourceAnalyzer
+        from gatehouse.lib.analyzer import SourceAnalyzer
         analyzer = SourceAnalyzer(source, filepath)
-    except SyntaxError:
-        return 0, ""
+    except Exception as exc:
+        err_msg = f"  Parse error in {filepath}: {exc}\n"
+        sys.stderr.write(err_msg)
+        return 1, err_msg
 
     # Run all checks
     all_violations = []
@@ -741,7 +732,13 @@ def scan_file(source, filepath, schema_path, output_format="stderr", skip_scope=
     variables = build_variables(analyzer)
 
     for rule_obj in active_rules:
-        violations = run_check(rule_obj, analyzer)
+        try:
+            violations = run_check(rule_obj, analyzer)
+        except Exception as exc:
+            # A broken rule must not silently approve the file.
+            # Treat the rule as having a violation so the file is blocked.
+            sys.stderr.write(f"  Rule '{rule_obj['id']}' raised {type(exc).__name__}: {exc}\n")
+            violations = [{"line": 1, "source": f"internal error in rule {rule_obj['id']}"}]
         if violations:
             all_violations.append((rule_obj, violations))
             for v in violations:

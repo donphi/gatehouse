@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "gatehouse"
-version = "0.2.0"
+version = "0.2.1"
 description = "Error-driven code schema enforcement for LLMs writing Python"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -35,16 +35,20 @@ Repository = "https://github.com/donphi/gatehouse"
 Issues = "https://github.com/donphi/gatehouse/issues"
 
 [project.scripts]
-gatehouse = "cli.gatehouse_cli:main"
-
-[tool.setuptools]
-py-modules = ["gate_engine"]
-script-files = ["python_gate"]
+gatehouse = "gatehouse.cli.gatehouse_cli:main"
 
 [tool.setuptools.packages.find]
-include = ["cli*", "lib*", "plugins*", "rules*", "schemas*"]
+where = ["src"]
+include = ["gatehouse*"]
+
+[tool.setuptools]
+script-files = ["src/gatehouse/python_gate"]
 
 [tool.setuptools.package-data]
-"cli" = ["*.yaml", "templates/*.yaml"]
-"rules" = ["*.yaml"]
-"schemas" = ["*.yaml"]
+"gatehouse" = [
+    "rules/*.yaml",
+    "schemas/*.yaml",
+    "cli/*.yaml",
+    "cli/templates/*.yaml",
+    "plugins/*.py",
+]

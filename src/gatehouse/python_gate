@@ -30,10 +30,24 @@ if [[ -n "${GATE_HOME:-}" ]] && [[ -f "${GATE_HOME}/gate_engine.py" ]]; then
 elif [[ -f "${SCRIPT_DIR}/gate_engine.py" ]]; then
     GATE_HOME="$SCRIPT_DIR"  # Dev / source checkout — engine is next to interceptor
 else
-    # pip install: gate_engine.py lives in site-packages, not next to python_gate.
-    # Ask the same Python interpreter to locate the installed module.
-    GATE_HOME=$($REAL_PYTHON -c "import os, gate_engine; print(os.path.dirname(os.path.abspath(gate_engine.__file__)))" 2>/dev/null)
+    # pip install: gate_engine.py lives in site-packages/gatehouse/, not next to python_gate.
+    # Ask the same Python interpreter to locate the installed package.
+    GATE_HOME=$($REAL_PYTHON -c "import os, gatehouse.gate_engine as ge; print(os.path.dirname(os.path.abspath(ge.__file__)))" 2>/dev/null)
 fi
+
+# Export so gate_engine.py receives the same home directory we discovered.
+# Without this, gate_engine falls back to Path(__file__).resolve().parent which
+# can differ due to symlinks, .pyc caching, or pip path indirection.
+export GATE_HOME
+
+# Ensure the gatehouse package is importable.  In a dev / source checkout,
+# GATE_HOME is  …/src/gatehouse/ so its grandparent (…/src/) must be on
+# PYTHONPATH.  When pip-installed, the package is already in site-packages.
+_SRC_ROOT="$(dirname "$(dirname "$GATE_HOME")")"
+case ":${PYTHONPATH:-}:" in
+    *":${_SRC_ROOT}:"*) ;;   # Already present
+    *) export PYTHONPATH="${_SRC_ROOT}${PYTHONPATH:+:$PYTHONPATH}" ;;
+esac
 
 GATE_ENGINE="${GATE_HOME}/gate_engine.py"
 

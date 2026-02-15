@@ -1,10 +1,10 @@
 include README.md
 include LICENSE
-include python_gate
+include src/gatehouse/python_gate
 
-recursive-include rules *.yaml
-recursive-include schemas *.yaml
-recursive-include cli *.yaml
-recursive-include cli/templates *.yaml
-recursive-include plugins *.py
+recursive-include src/gatehouse/rules *.yaml
+recursive-include src/gatehouse/schemas *.yaml
+recursive-include src/gatehouse/cli *.yaml
+recursive-include src/gatehouse/cli/templates *.yaml
+recursive-include src/gatehouse/plugins *.py
 recursive-include examples *.py *.json *.yaml
