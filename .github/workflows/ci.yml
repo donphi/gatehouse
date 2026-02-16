@@ -59,7 +59,7 @@ jobs:
       - name: Verify all modules import
         run: |
           python -c "
-          from gatehouse import scan_file, ScanResult, Violation, GatehouseViolationError
+          from gatehouse import scan_file, ScanResult, Violation, GatehouseViolationError, PluginError
           from gatehouse.lib.yaml_loader import load_yaml
           from gatehouse.lib.theme import colorize
           from gatehouse.lib.rules import load_rule, load_schema
@@ -67,8 +67,11 @@ jobs:
           from gatehouse.lib.formatter import inject_variables
           from gatehouse.lib.logger import log_scan
           from gatehouse.lib.scope import is_file_in_scope
+          from gatehouse.lib.config import get, get_str, get_int, get_list
+          from gatehouse.lib.models import RuleEntry, ScopeConfig, GatehouseConfig, validate_project_config
           from gatehouse.engine import scan_file
-          from gatehouse.auto import install, uninstall
+          from gatehouse.auto import activate, deactivate
           from gatehouse.cli.main import main
+          from gatehouse.cli.wizard import cmd_new_rule
           print('All modules import successfully')
           "
