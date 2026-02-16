@@ -1,8 +1,16 @@
-"""
-SourceAnalyzer — single-parse, single-metadata-resolve analysis of Python source.
+"""SourceAnalyzer — single-parse, single-metadata-resolve analysis of Python source.
 
-Every Gatehouse rule queries this object. No rule touches raw source text.
-The CST + metadata providers give deterministic, grammar-defined checks.
+Every Gatehouse rule queries this object.  No rule touches raw source text.
+The CST and metadata providers give deterministic, grammar-defined checks.
+Each file is parsed exactly once into a concrete syntax tree, and a shared
+MetadataWrapper resolves all provider data in a single pass.
+
+Design notes:
+    The single-parse strategy means each Python file is parsed into a CST
+    exactly once.  A shared MetadataWrapper resolves ParentNodeProvider and
+    PositionProvider for all visitors, avoiding redundant tree traversals.
+    Every check function receives the pre-built SourceAnalyzer rather than
+    raw source, ensuring consistent, grammar-level analysis across all rules.
 """
 
 import os
@@ -18,7 +26,15 @@ from libcst.metadata import MetadataWrapper, ParentNodeProvider, PositionProvide
 
 
 class _LiteralCollector(cst.CSTVisitor):
-    """Walk the CST and collect literal nodes inside function/method bodies."""
+    """Walk the CST and collect literal nodes inside function/method bodies.
+
+    Attributes:
+        safe_values: Set of values exempt from hardcoded-literal checks.
+        safe_contexts: List of context names where literals are allowed.
+        violations: Accumulated violation dicts found during traversal.
+        _func_depth: Nesting depth counter to track whether traversal is
+            inside a function body.
+    """
 
     METADATA_DEPENDENCIES = (ParentNodeProvider, PositionProvider)
 
@@ -41,12 +57,18 @@ class _LiteralCollector(cst.CSTVisitor):
     def _is_safe_value(self, value: object) -> bool:
         """Type-aware safe value check. Prevents True==1 / False==0 collision."""
         for sv in self.safe_values:
+            # Use type() identity instead of isinstance() because bool is a
+            # subclass of int in Python; isinstance(True, int) is True, so
+            # True == 1 and False == 0 would incorrectly pass an int check.
             if type(sv) is type(value) and sv == value:
                 return True
         return False
 
     def _is_docstring(self, node: cst.CSTNode) -> bool:
         """Check if a string node is a docstring (first Expr statement in a body)."""
+        # Traverse a 4-level parent chain: String → Expr → SimpleStatementLine
+        # → IndentedBlock.  A docstring is a bare string expression that is the
+        # first statement inside an indented block (function, class, or module).
         parent = self.get_metadata(ParentNodeProvider, node, None)
         if not isinstance(parent, cst.Expr):
             return False
@@ -137,6 +159,9 @@ class _LiteralCollector(cst.CSTVisitor):
 
     def visit_UnaryOperation(self, node: cst.UnaryOperation) -> None:
         """Handle negative numbers: -1 is UnaryOperation(Minus, Integer)."""
+        # In the CST, negative literals like -1 are not Integer(-1) but
+        # UnaryOperation(operator=Minus, expression=Integer("1")).  This
+        # visitor reconstructs the negative value for safe-value matching.
         if not isinstance(node.operator, cst.Minus):
             return
         if self._func_depth == 0:
@@ -178,7 +203,11 @@ class _LiteralCollector(cst.CSTVisitor):
 # ---------------------------------------------------------------------------
 
 class _FunctionDocstringCollector(cst.CSTVisitor):
-    """Collect functions that are missing docstrings."""
+    """Collect functions that are missing docstrings.
+
+    Attributes:
+        violations: Accumulated violation dicts for functions without docstrings.
+    """
 
     METADATA_DEPENDENCIES = (PositionProvider,)
 
@@ -205,7 +234,13 @@ class _FunctionDocstringCollector(cst.CSTVisitor):
 # ---------------------------------------------------------------------------
 
 class _DecoratedFunctionCollector(cst.CSTVisitor):
-    """Check decorated functions for docstrings or try/except."""
+    """Check decorated functions for docstrings or try/except.
+
+    Attributes:
+        decorator_patterns: Substrings to match against decorator names.
+        check_type: The kind of check to perform (``"docstring"`` or ``"try_except"``).
+        violations: Accumulated violation dicts for failing functions.
+    """
 
     METADATA_DEPENDENCIES = (PositionProvider,)
 
@@ -236,7 +271,11 @@ class _DecoratedFunctionCollector(cst.CSTVisitor):
 # ---------------------------------------------------------------------------
 
 class _ForLoopProgressCollector(cst.CSTVisitor):
-    """Check for loops that don't use progress tracking."""
+    """Check for loops that don't use progress tracking.
+
+    Attributes:
+        violations: Accumulated violation dicts for loops missing progress wrappers.
+    """
 
     METADATA_DEPENDENCIES = (PositionProvider,)
 
@@ -318,11 +357,17 @@ def _has_try_except(func_node: cst.FunctionDef) -> bool:
 # ---------------------------------------------------------------------------
 
 class SourceAnalyzer:
-    """
-    Single parse + metadata resolution for a Python source file.
+    """Single parse and metadata resolution for a Python source file.
 
-    All rules query this object. Rules never parse, tokenize, or scan.
-    Created once per file in scan_file().
+    All rules query this object.  Rules never parse, tokenize, or scan raw
+    source directly.  Created once per file in ``scan_file()``.
+
+    Attributes:
+        source: Raw source text of the file.
+        filepath: Absolute or relative path to the source file.
+        source_lines: Source text split into individual lines.
+        module: Parsed libcst Module node.
+        wrapper: MetadataWrapper providing resolved metadata for all visitors.
     """
 
     def __init__(self, source: str, filepath: str) -> None:
@@ -478,10 +523,12 @@ class SourceAnalyzer:
 
     def build_variables(self, extra: Optional[dict] = None) -> dict:
         """Build the variable dict for error template injection."""
+        # 1. Derive file identity variables from the path
         filename = os.path.basename(self.filepath)
         directory = os.path.dirname(self.filepath)
         module_name = os.path.splitext(filename)[0]
 
+        # 2. Populate the base variable dict
         variables: dict = {
             "filename": filename,
             "filepath": self.filepath,
@@ -490,6 +537,7 @@ class SourceAnalyzer:
             "line_count": self.line_count(),
         }
 
+        # 3. Collect function and class names via a lightweight CST visitor
         func_names = []
         class_names = []
 
@@ -505,9 +553,11 @@ class SourceAnalyzer:
 
         self.wrapper.visit(_NameCollector())
 
+        # 4. Join collected names into comma-separated strings
         variables["function_names"] = ", ".join(func_names)
         variables["class_names"] = ", ".join(class_names)
 
+        # 5. Merge any caller-supplied extra variables
         if extra:
             variables.update(extra)
 

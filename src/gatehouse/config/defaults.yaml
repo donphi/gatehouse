@@ -1,0 +1,226 @@
+statuses:
+  passed: "passed"
+  rejected: "rejected"
+
+severities:
+  block: "block"
+  warn: "warn"
+  "off": "off"
+  valid_choices: ["block", "warn"]
+
+modes:
+  hard: "hard"
+  soft: "soft"
+  "off": "off"
+  default: "off"
+
+formats:
+  stderr: "stderr"
+  json: "json"
+  default: "stderr"
+
+env_vars:
+  gate_home: "GATE_HOME"
+  mode: "GATEHOUSE_MODE"
+  schema: "GATEHOUSE_SCHEMA"
+  outer_verdict: "GATEHOUSE_OUTER_VERDICT"
+
+filenames:
+  project_config: ".gate_schema.yaml"
+  scan_log: "violations.jsonl"
+  theme: "theme.yaml"
+  rule_extension: ".yaml"
+  schema_extension: ".yaml"
+
+directories:
+  rules: "rules"
+  schemas: "schemas"
+  cli: "cli"
+  plugins: "plugins"
+
+defaults:
+  schema_name: "production"
+  schema_version: "0.0.0"
+  severity: "warn"
+  enabled: true
+  output_format: "stderr"
+  stdin_filename: "stdin.py"
+  new_rule_version: "1.0.0"
+  log_directory: "./logs/gate"
+  max_lines: 1000
+  min_uppercase_count: 1
+  min_constant_name_length: 2
+  json_indent: 2
+  hash_truncation_length: 12
+  meta_path_position: 0
+  plugin_function_name: "check"
+  plugin_spec_name: "plugin"
+  fallback_line: 0
+  error_line: 1
+  progress_wrappers: ["track", "tqdm"]
+  log_keywords: ["log.", "logging.", "print(", "logger."]
+  marker_separator: ":"
+
+exit_codes:
+  ok: 0
+  blocked: 1
+  error: 1
+
+formatting:
+  summary_bar_width: 62
+  summary_bar_char: "\u2501"
+  prompt_box_width: 61
+  status_separator_width: 56
+  rule_list_separator_width: 60
+  banner_fallback_width: 60
+  banner_min_width: 60
+  check_type_column_width: 25
+  caret_char: "^"
+  indent: "    "
+  violation_separator: "\n\n"
+  json_separators: [",", ":"]
+  utc_offset_source: "+00:00"
+  utc_offset_replacement: "Z"
+  traceback_header: "Traceback (most recent call last):"
+  hash_prefix: "sha256:"
+
+check_types:
+  pattern_exists: "pattern_exists"
+  ast_node_exists: "ast_node_exists"
+  ast_check: "ast_check"
+  token_scan: "token_scan"
+  uppercase_assignments: "uppercase_assignments_exist"
+  docstring_contains: "docstring_contains"
+  file_metric: "file_metric"
+  custom: "custom"
+
+locations:
+  first_non_empty_line: "first_non_empty_line"
+  anywhere: "anywhere"
+  end_of_file: "end_of_file"
+
+node_types:
+  module_docstring: "module_docstring"
+  import_statement: "import_statement"
+
+ast_checks:
+  all_functions_docstrings: "all_functions_have_docstrings"
+  for_loops_progress: "for_loops_without_progress"
+  decorated_docstrings: "decorated_functions_have_docstrings"
+  decorated_try_except: "decorated_functions_have_try_except"
+
+check_modes:
+  docstring: "docstring"
+  try_except: "try_except"
+
+scan_types:
+  hardcoded_literals: "hardcoded_literals"
+  log_calls_containing: "log_calls_containing"
+
+patterns:
+  if_name_main: "if_name_main"
+  print_call_with_checkmark: "print_call_with_checkmark"
+  comment_block_starting_with: "comment_block_starting_with"
+
+skip_markers:
+  site_packages: "site-packages"
+  dist_packages: "dist-packages"
+
+labels:
+  schema: "Schema:"
+  violations: "Violations:"
+  blocking: "blocking"
+  warnings: "warnings"
+  execution_blocked: "Execution: BLOCKED"
+  execution_allowed: "Execution: ALLOWED (warnings only)"
+  status_off: "OFF"
+  status_block: "BLOCK"
+  status_warn: "WARN"
+  found: "found"
+  not_found: "NOT FOUND"
+  status_header: "GATEHOUSE STATUS"
+  custom_severity: "custom"
+  unknown_schema: "unknown"
+
+colors:
+  error: "red"
+  success: "green"
+  block: "red"
+  warn: "cyan"
+  subtitle: "white"
+  tagline: "dim"
+  bold: "bold"
+  dim: "dim"
+
+cli:
+  prog_name: "gatehouse"
+  description: "Gatehouse \u2014 Error-driven code schema enforcement"
+  confirm_char: "y"
+  activate_mode: "hard"
+  engine_module: "gatehouse.engine"
+  test_schema_name: "test-single-rule"
+  test_schema_version: "0.0.0"
+
+mode_colors:
+  hard: "red"
+  soft: "yellow"
+  "off": "dim"
+
+mode_labels:
+  hard: "All violations will BLOCK execution"
+  soft: "Violations produce warnings but allow execution"
+  "off": "Gatehouse is not active"
+
+messages:
+  schema_not_found: "Warning: Schema '{name}' not found at {path}"
+  rule_not_found: "Warning: Rule '{rule_id}' not found in {path}"
+  rule_exception: "Rule '{rule_id}' raised {error}: {detail}"
+  internal_rule_error: "internal error in rule '{rule_id}'"
+  unknown_check_type: "Warning: Unknown check type '{check_type}' in rule '{rule_id}'"
+  expression_deprecated: "Warning: Inline 'expression' checks are disabled (security). Use a plugin file instead."
+  plugin_load_error: "Cannot load plugin from '{path}'"
+  plugin_error: "Custom check plugin error in '{rule_id}': {error}"
+  module_not_found: "Cannot find module source for '{name}'"
+  violation_summary: "Gatehouse: {count} blocking violation(s) in {filepath}"
+  violation_line_format: "Line {line}: {message}"
+  fix_prefix: "Fix: "
+  default_violation: "Violation of rule '{rule_id}'"
+  parse_error: "Parse error in {filepath}: {error}"
+  aborted: "Aborted."
+  invalid_mode: "'hard' or 'soft'"
+  invalid_severity: "Please enter 'block' or 'warn'"
+  invalid_number: "Please enter a number"
+  deactivate_info: "Gatehouse will pass through all imports without scanning."
+  persist_hint: "~/.bashrc or ~/.zshrc"
+  home_auto: "(auto-discovered)"
+  home_env: "($GATE_HOME)"
+
+prompts:
+  severity_question: "Should this BLOCK execution or just WARN?"
+  block_description: "Code cannot run until this is fixed"
+  warn_description: "Show a warning but allow execution"
+  severity_input_label: "Select [block/warn]: "
+
+shell_commands:
+  activate: "export GATEHOUSE_MODE={mode}"
+  deactivate: "export GATEHOUSE_MODE=off"
+  alias: 'alias python="python_gate"'
+
+traceback:
+  exception_prefix: "gatehouse.exceptions.GatehouseViolationError: "
+  error_name: "GatehouseViolationError"
+  file_line_template: 'File "{filepath}", line {line}'
+
+branding_defaults:
+  title: "GATEHOUSE"
+  subtitle: ""
+  version: ""
+  tagline: ""
+  title_color: "cyan"
+  border_color: "white"
+
+lint_rules:
+  required_keys: ["name", "check", "error", "defaults"]
+  required_check_keys: ["type"]
+  required_error_keys: ["message"]
+  required_defaults_keys: ["severity", "enabled"]

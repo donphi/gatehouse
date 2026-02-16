@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/lib/rules.py
+# hypothesis_version: 6.151.8
+
+['additional_rules', 'defaults', 'defaults.enabled', 'defaults.severity', 'enabled', 'extends', 'id', 'params', 'rule_data', 'rule_overrides', 'rules', 'severity']

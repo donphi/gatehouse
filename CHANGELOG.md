@@ -4,6 +4,55 @@ All notable changes to Gatehouse will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.0] - 2026-02-16
+
+### Added
+
+- **Modular library architecture** — decomposed the monolithic `gate_engine.py` (845 lines) into 10 focused modules under `lib/`:
+  - `lib/analyzer.py` — `SourceAnalyzer` class: single CST parse + metadata resolution for all rules
+  - `lib/checks.py` — check-type dispatch and implementations (`run_check()` + 8 check functions)
+  - `lib/config.py` — lazy-loaded, typed accessors for `config/defaults.yaml`
+  - `lib/formatter.py` — violation formatting for stderr, JSON, and traceback output
+  - `lib/logger.py` — JSONL scan telemetry logging
+  - `lib/rules.py` — rule/schema loading with inheritance resolution
+  - `lib/scope.py` — file scope checking and per-path schema overrides
+  - `lib/theme.py` — ANSI colour theme loading from `cli/theme.yaml`
+  - `lib/yaml_loader.py` — unified YAML loading utility
+  - `lib/models.py` — frozen dataclasses (`RuleEntry`, `ScopeConfig`, `GatehouseConfig`) replacing raw dict access
+- **`engine.py`** — thin orchestrator that composes the `lib/` modules; the new primary entry point for programmatic usage
+- **`auto.py`** — import-hook enforcement layer via `sys.meta_path` MetaPathFinder; intercepts Python imports and validates against the schema before any module loads, covering pytest, Jupyter, Celery, subprocess, and `python -m` execution paths
+- **`exceptions.py`** — dedicated exception module with `GatehouseViolationError(ImportError)`, `GatehouseParseError(Exception)`, and `PluginError(Exception)`
+- **`config/defaults.yaml`** — all string literals, messages, labels, severities, modes, env var names, directory names, and filenames externalised to YAML; zero hardcoded values remain in Python code
+- **`cli/main.py`** — CLI entry point with argument parsing and command dispatch
+- **`cli/commands.py`** — CLI command handlers for all subcommands
+- **`cli/prompts.py`** — interactive terminal input helpers for the rule builder
+- **`cli/wizard.py`** — interactive rule creation wizard (extracted from `new-rule` command)
+- **Stable public API** — `__init__.py` exports `scan_file`, `ScanResult`, `Violation`, `GatehouseViolationError`, `PluginError` with semver-protected guarantees and a deprecation policy
+- **`validate_project_config()`** — structural validation for `.gate_schema.yaml` files with human-readable error messages
+- **Comprehensive test suite** — 16 test modules covering every library module, the engine, import hook, CLI, exceptions, formatter, theme, models, edge cases, fuzz inputs, and performance:
+  - `conftest.py` with shared fixtures (gate_home, tmp_project, passing/failing source)
+  - `tests/fixtures/` with passing, failing, and edge-case Python files
+- **GitHub Actions CI** — matrix testing across Python 3.9–3.13, import verification lint step
+- **Anti-double-scan coordination** — `python_gate` sets `GATEHOUSE_OUTER_VERDICT` env var so `auto.py`'s import hook skips files already scanned by the outer shim
+
+### Changed
+
+- **CLI entry point** moved from `gatehouse.cli.gatehouse_cli:main` to `gatehouse.cli.main:main`
+- **`_paths.py`** reads all directory and filename constants from `config/defaults.yaml` via lazy accessor instead of hardcoding them
+- **`python_gate`** now references `gatehouse.engine` instead of `gatehouse.gate_engine`; uses `GATEHOUSE_OUTER_VERDICT` for hook coordination
+- **`run_check` signature** changed from `(rule_obj, analyzer)` to `(rule_obj, analyzer, gate_home)` to support plugin resolution without global state
+- **`pyproject.toml`** adds `dev` optional dependencies (`pytest>=7.0`, `pytest-cov>=4.0`), `[tool.pytest.ini_options]` configuration, and `config/*.yaml` to package data
+
+### Deprecated
+
+- **`gatehouse.gate_engine`** — now a 20-line shim that emits `DeprecationWarning` and delegates to `gatehouse.engine`. Will be removed in v0.4.0.
+
+### Removed
+
+- **`gatehouse_cli.py`** (795 lines) — replaced by `cli/main.py`, `cli/commands.py`, `cli/prompts.py`, `cli/wizard.py`
+- **All logic from `gate_engine.py`** (845 → 20 lines) — replaced by `engine.py` and `lib/` modules
+- **Inline YAML loader fallback** — the `try: import yaml / except: simple_parser` pattern in `gate_engine.py` is gone; `pyyaml>=6.0` is now a hard dependency
+
 ## [0.2.2] - 2026-02-15
 
 ### Fixed

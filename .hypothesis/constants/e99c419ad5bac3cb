@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/lib/formatter.py
+# hypothesis_version: 6.151.8
+
+['blocking', 'error', 'file', 'filepath', 'fix', 'id', 'labels.blocking', 'labels.schema', 'labels.violations', 'labels.warnings', 'line', 'message', 'messages.fix_prefix', 'rule', 'rule_data', 'severities.block', 'severities.warn', 'severity', 'source', 'status', 'statuses.passed', 'statuses.rejected', 'summary', 'total_rules', 'traceback.error_name', 'value', 'violations', 'warnings']

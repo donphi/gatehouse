@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Run tests
+        run: |
+          python -m pytest tests/ -v --tb=short --cov=gatehouse --cov-report=term-missing
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Check import order
+        run: |
+          python -c "import gatehouse; print(f'gatehouse {gatehouse.__version__} imported OK')"
+
+      - name: Verify all modules import
+        run: |
+          python -c "
+          from gatehouse import scan_file, ScanResult, Violation, GatehouseViolationError
+          from gatehouse.lib.yaml_loader import load_yaml
+          from gatehouse.lib.theme import colorize
+          from gatehouse.lib.rules import load_rule, load_schema
+          from gatehouse.lib.checks import run_check
+          from gatehouse.lib.formatter import inject_variables
+          from gatehouse.lib.logger import log_scan
+          from gatehouse.lib.scope import is_file_in_scope
+          from gatehouse.engine import scan_file
+          from gatehouse.auto import install, uninstall
+          from gatehouse.cli.main import main
+          print('All modules import successfully')
+          "

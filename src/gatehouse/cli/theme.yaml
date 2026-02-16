@@ -1,6 +1,6 @@
 # cli/theme.yaml
 # Centralised ANSI colour theme for all Gatehouse output.
-# Both gate_engine.py and gatehouse_cli.py load from here.
+# Loaded by gatehouse.lib.theme at runtime.
 # Change colours once, applies everywhere.
 
 ansi:

@@ -1,1 +1,1 @@
-"""Gatehouse schemas — Rule set manifests for different enforcement profiles."""
+"""Gatehouse schemas — YAML schema manifests defining enforcement profiles."""

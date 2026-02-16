@@ -1,8 +1,12 @@
-"""
-Standalone gate usage with any LLM API.
-The gate runs locally. The LLM runs anywhere (API, local, etc.).
+"""Example: standalone gate validation loop with any LLM API.
 
-This example shows the pattern with a placeholder. It works with any LLM API.
+Demonstrates the core generate-validate-fix loop: an LLM generates Python
+code, Gatehouse validates it against a schema, and violations are fed back
+to the LLM until the code passes. The LLM call is a placeholder you can
+replace with any SDK (OpenAI, Anthropic, local models, etc.).
+
+Usage:
+    python examples/standalone_usage.py
 """
 
 import os
@@ -13,7 +17,17 @@ import subprocess
 
 
 def extract_code_from_response(response_text):
-    """Extract Python code from a markdown code block in the response."""
+    """Extract Python code from a markdown code block in the response.
+
+    Looks for a fenced ``python`` block first, then any fenced block,
+    and falls back to the raw text if no fences are found.
+
+    Args:
+        response_text: Raw LLM response that may contain markdown fences.
+
+    Returns:
+        The extracted Python source code as a string.
+    """
     if "```python" in response_text:
         start = response_text.index("```python") + len("```python")
         end = response_text.index("```", start)
@@ -26,14 +40,23 @@ def extract_code_from_response(response_text):
 
 
 def log_violation(filepath, iteration, violations, code):
-    """Log a violation for telemetry."""
+    """Log a violation for telemetry.
+
+    Args:
+        filepath: Path of the file that was validated.
+        iteration: Zero-based retry iteration number.
+        violations: Newline-separated violation messages from the gate.
+        code: The source code that produced the violations.
+    """
     print(f"  Iteration {iteration + 1}: {len(violations.splitlines())} violation lines")
 
 
 def main():
-    """
-    Example: Generate a Python file using an LLM, validate it with the gate,
-    and loop until it passes.
+    """Run the generate-validate-fix loop.
+
+    Loads a gate schema, sends a placeholder prompt to an LLM, validates
+    the generated code with the Gatehouse engine, and prints the results.
+    In production, replace the placeholder with a real LLM API call.
     """
     # Use the installed gatehouse package via python -m
     gate_engine_module = "gatehouse.gate_engine"

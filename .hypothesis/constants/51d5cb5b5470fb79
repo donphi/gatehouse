@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/lib/analyzer.py
+# hypothesis_version: 6.151.8
+
+[', ', '.', 'False', 'None', 'True', '_', '__main__', '__name__', 'boolean', 'call_argument', 'class_names', 'dict_key', 'dict_value', 'directory', 'docstring', 'filename', 'filepath', 'function_name', 'function_names', 'leading_lines', 'line', 'line_count', 'module_name', 'name', 'numeric', 'params', 'print', 'source', 'string', 'tqdm', 'track', 'try_except', 'value', 'value_type']

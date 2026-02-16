@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/lib/checks.py
+# hypothesis_version: 6.151.8
+
+['anywhere', 'ast_check', 'ast_checks', 'ast_node_exists', 'check', 'check_modes', 'check_types', 'custom', 'decorated_docstrings', 'decorated_try_except', 'decorator_pattern', 'defaults.error_line', 'defaults.max_lines', 'docstring', 'docstring_contains', 'end_of_file', 'expression', 'file_metric', 'first_non_empty_line', 'for_loops_progress', 'forbidden_strings', 'function', 'hardcoded_literals', 'id', 'if_name_main', 'import_statement', 'line', 'line_count', 'location', 'locations', 'log_calls_containing', 'max_lines', 'metric', 'min_count', 'module_docstring', 'node', 'node_types', 'params', 'pattern', 'pattern_exists', 'patterns', 'plugin', 'required_substrings', 'rule_data', 'safe_contexts', 'safe_values', 'scan', 'scan_types', 'source', 'token_scan', 'try_except', 'type', 'value', '{']

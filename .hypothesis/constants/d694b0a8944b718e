@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/auto.py
+# hypothesis_version: 6.151.8
+
+['.py', '?', 'Python script to run', '__main__', 'defaults.error_line', 'env_vars.mode', 'env_vars.schema', 'fix', 'formats.stderr', 'line', 'message', 'modes.hard', 'modes.off', 'modes.soft', 'rule_id', 'severities.block', 'target', 'utf-8']

@@ -4,16 +4,138 @@
 [![Python versions](https://img.shields.io/pypi/pyversions/gatehouse.svg)](https://pypi.org/project/gatehouse/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**Error-driven code schema enforcement for Python.**
+**Execution-time code schema enforcement for Python.**
 
-Gatehouse validates Python files against structural rules and blocks non-compliant code before it runs. Designed for agentic coding environments where LLMs write code: Cursor, Windsurf, Aider, or raw API prompts.
+<!-- TODO: Replace with terminal recording gif -->
+<p align="center">
+  <img src="" alt="Gatehouse terminal demo" width="720">
+  <br>
+  <em>terminal gif placeholder — drop your recording here</em>
+</p>
 
-LLMs are unreliable at following instructions but reliable at fixing errors. Gatehouse turns your coding standards into deterministic error messages with exact fix instructions.
+---
+
+## Why Gatehouse Exists
+
+Large Language Models do not deterministically follow coding standards.
+
+You can provide:
+- system prompts
+- `skills.md`
+- style guides
+- architectural rules
+
+These reduce violation probability. They do not guarantee compliance.
+
+For production code, probabilistic control is insufficient.
+
+Gatehouse replaces instruction-following with enforcement.
+
+---
+
+## The Core Problem
+
+LLMs generate syntactically valid Python.
+
+They do not reliably:
+- enforce architectural constraints
+- prevent hardcoded values
+- maintain structural invariants
+- preserve file headers or module contracts
+- separate configuration from logic
+
+Prompting improves outcomes. It does not make them deterministic.
+
+There is no prompt that guarantees structure.
+
+---
+
+## The Gatehouse Model
+
+Gatehouse moves enforcement from the prompt layer to the execution layer.
+
+Instead of asking the LLM to behave, Gatehouse blocks execution until code conforms.
+
+The control loop becomes:
 
 ```
-LLM writes code ▶ Gatehouse blocks it ▶ error says exactly what to fix
-▶ LLM fixes ▶ Gatehouse checks again ▶ compliant code runs
+LLM writes code
+▶ Gatehouse validates
+▶ If violations exist: execution is blocked
+▶ Deterministic errors specify exactly what to fix
+▶ LLM updates code
+▶ Validation repeats
+▶ Compliant code runs
 ```
+
+If the code runs, it passed the schema.
+If it failed, the failure is explicit and localized.
+
+---
+
+## Two Enforcement Invariants
+
+### 1. No-Run Invariant
+
+Non-compliant code does not execute in `hard` mode.
+
+This is enforced at invocation time.
+There is no partial compliance.
+
+### 2. Repairability Invariant
+
+Every violation includes:
+
+- File path
+- Exact line number
+- Offending code span
+- Stable rule ID
+- Clear rule description
+- Explicit fix instruction
+
+Errors are structured to be machine-consumable and LLM-repairable.
+
+Gatehouse treats the LLM as a compiler error resolver, not a trusted generator.
+
+---
+
+## Prompts Guide. Gates Guarantee.
+
+Prompting is advisory.
+Gatehouse is deterministic.
+
+Coding standards become executable policy.
+
+The result:
+
+- No structural drift
+- No silent hardcoded parameters
+- No undocumented modules
+- No accidental architectural violations
+
+Standards are no longer documentation.
+They are enforced before execution.
+
+---
+
+## What Gatehouse Is Not
+
+- Not a linter.
+- Not a formatter.
+- Not a style preference tool.
+- Not an LLM instruction wrapper.
+
+Gatehouse is execution-time schema enforcement for Python.
+
+It ensures that code either:
+- conforms to structural rules, or
+- does not run.
+
+---
+
+# Getting Started
+
+Everything below is what you need to install, activate, and start using Gatehouse.
 
 ---
 
@@ -63,7 +185,7 @@ If violations exist, execution is blocked and errors tell the LLM exactly what t
 
 ---
 
-## What Happens
+## What a Rejection Looks Like
 
 Given this code:
 
@@ -92,7 +214,7 @@ Gatehouse blocks it:
   Execution: BLOCKED
 ```
 
-Every error includes the file, line, offending code, what's wrong, and how to fix it.
+Every error includes the file, line, offending code, what went wrong, and how to fix it.
 
 ---
 
@@ -156,11 +278,14 @@ gatehouse init --schema <name>           # Initialize project
 gatehouse activate [--mode hard|soft]    # Print shell activation commands
 gatehouse deactivate                     # Print deactivation commands
 gatehouse status                         # Show mode and config
+gatehouse status --verbose               # Show resolved rules, schemas, scope
 gatehouse list-rules                     # List all available rules
 gatehouse list-rules --schema <name>     # List rules in a schema
 gatehouse new-rule                       # Create a rule interactively
 gatehouse test-rule <rule> <file>        # Test a rule against a file
-gatehouse disable-rule <rule> --schema <name>
+gatehouse disable-rule <rule>            # Disable a rule in project config
+gatehouse enable-rule <rule>             # Re-enable a disabled rule
+gatehouse lint-rules                     # Validate all rule YAML files
 ```
 
 ---
@@ -170,24 +295,35 @@ gatehouse disable-rule <rule> --schema <name>
 Use Gatehouse programmatically with any LLM API:
 
 ```python
+from gatehouse import scan_file
+
+source = open("src/train.py").read()
+result = scan_file(source, "src/train.py", ".gate_schema.yaml")
+
+if result.status == "rejected":
+    for v in result.violations:
+        print(f"[{v.severity}] {v.rule_id} line {v.line}: {v.message}")
+        print(f"  Fix: {v.fix}")
+    # Feed result back to the LLM for repair
+else:
+    print("Passed — safe to execute")
+```
+
+Or via subprocess for isolated environments:
+
+```python
 import subprocess
 
 result = subprocess.run(
-    ["python3", "-m", "gatehouse.gate_engine", "--stdin",
-     "--schema", ".gate_schema.yaml",
-     "--filename", "src/train.py"],
-    input=code_from_llm,
+    ["python3", "-m", "gatehouse.engine",
+     "--file", "src/train.py",
+     "--schema", ".gate_schema.yaml"],
     capture_output=True, text=True
 )
 
-if result.returncode == 0:
-    with open("src/train.py", "w") as f:
-        f.write(code_from_llm)
-else:
+if result.returncode != 0:
     errors = result.stderr  # Feed back to the LLM
 ```
-
-See `examples/standalone_usage.py` for a complete loop.
 
 ---
 
@@ -197,14 +333,14 @@ Everything below is for understanding internals, customizing rules, and contribu
 
 ---
 
-## Architecture: Linear Data Flow
+## Architecture
 
-Every Python invocation flows through the same linear path:
+Every Python invocation flows through two enforcement layers:
 
 ```
 ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│ python_gate  │ ──▶ │ gate_engine  │ ──▶ │SourceAnalyzer│ ──▶ │  Rule YAML   │
-│(interceptor) │     │ (dispatcher) │     │(LibCST parse)│     │(check config)│
+│ python_gate  │ ──▶ │   engine     │ ──▶ │SourceAnalyzer│ ──▶ │  Rule YAML   │
+│(outer shim)  │     │ (dispatcher) │     │(LibCST parse)│     │(check config)│
 └──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
        │                    │                    │                    │
        ▼                    ▼                    ▼                    ▼
@@ -213,15 +349,29 @@ Every Python invocation flows through the same linear path:
   checks mode,        runs each rule         One metadata          analyzer for
   finds schema        through the            resolve.              its check.
                       dispatcher             All rules share it.
+
+┌──────────────┐
+│ gatehouse.   │     ◀ Inner hook: validates on `import` inside the process
+│ auto         │        Catches pytest, Jupyter, Celery, subprocess, etc.
+└──────────────┘
 ```
+
+### Dual-layer enforcement
+
+| Layer | Mechanism | Catches |
+|-------|-----------|---------|
+| **Outer** (`python_gate`) | Shell alias intercepts `python` calls | Direct script invocations |
+| **Inner** (`gatehouse.auto`) | `sys.meta_path` import hook | Imports during test discovery, notebook cells, worker processes |
+
+Both layers share the `GATEHOUSE_OUTER_VERDICT` marker to prevent double-scanning.
 
 ### Step by step
 
 1. **`python_gate`** intercepts `python` calls at the OS level. Checks `$GATEHOUSE_MODE` — if `off`, passes through immediately. Otherwise finds `.gate_schema.yaml` by walking up from the target file.
 
-2. **`gate_engine.py`** (dispatcher) loads the schema, resolves which rules are active, creates a single `SourceAnalyzer`, and passes it to each rule's check function.
+2. **`engine.py`** (dispatcher) loads the schema, resolves which rules are active, creates a single `SourceAnalyzer`, and passes it to each rule's check function.
 
-3. **`lib/analyzer.py`** (`SourceAnalyzer`) parses the source once with [LibCST](https://github.com/Instagram/LibCST) and resolves metadata providers (`PositionProvider`, `ParentNodeProvider`). Every rule queries this object — no rule touches raw source text.
+3. **`SourceAnalyzer`** parses the source once with [LibCST](https://github.com/Instagram/LibCST) and resolves metadata providers (`PositionProvider`, `ParentNodeProvider`). Every rule queries this object — no rule touches raw source text.
 
 4. **`rules/*.yaml`** define what to check. Each YAML file declares a check type, parameters, error message, and fix instruction. The engine maps check types to `SourceAnalyzer` methods internally.
 
@@ -230,22 +380,37 @@ Every Python invocation flows through the same linear path:
 ### File map
 
 ```
-gatehouse/                       (repo root)
+gatehouse/
 ├── src/
 │   └── gatehouse/
-│       ├── __init__.py          Package root — defines __version__
-│       ├── _paths.py            SINGLE source of truth for ALL path resolution
-│       ├── gate_engine.py       Dispatcher — loads rules, routes checks, formats output
-│       ├── python_gate          Interceptor — validates before Python runs
+│       ├── __init__.py          Public API: scan_file, ScanResult, Violation
+│       ├── _paths.py            Single source of truth for all path resolution
+│       ├── engine.py            Dispatcher — loads rules, routes checks, formats output
+│       ├── gate_engine.py       Deprecated shim (v0.3 → use engine.py)
+│       ├── auto.py              Import hook — sys.meta_path enforcement
+│       ├── python_gate          Outer shell interceptor
+│       ├── exceptions.py        GatehouseViolationError, PluginError, GatehouseParseError
+│       ├── config/
+│       │   └── defaults.yaml    All internal constants, labels, messages (zero hardcoding)
 │       ├── lib/
-│       │   └── analyzer.py      SourceAnalyzer — single LibCST parse + metadata
-│       ├── rules/               One YAML file per rule (12 built-in)
+│       │   ├── config.py        Lazy config accessor — get(), get_str(), get_int()
+│       │   ├── checks.py        Check type implementations
+│       │   ├── rules.py         Rule/schema loading and resolution
+│       │   ├── scope.py         File scope and per-path schema overrides
+│       │   ├── formatter.py     Violation formatting (stderr, JSON, traceback)
+│       │   ├── logger.py        JSONL scan logging
+│       │   ├── theme.py         ANSI color theme (from theme.yaml)
+│       │   ├── models.py        Typed dataclasses: RuleEntry, ScopeConfig, GatehouseConfig
+│       │   └── yaml_loader.py   Unified YAML loading
+│       ├── rules/               One YAML file per rule (built-in)
 │       ├── schemas/             Schema manifests (production, api, exploration, minimal)
 │       ├── cli/
-│       │   └── gatehouse_cli.py Interactive CLI for rule management
+│       │   ├── main.py          Argparse entry point and command dispatch
+│       │   ├── commands.py      Command handlers (init, status, activate, lint-rules, …)
+│       │   ├── wizard.py        Interactive new-rule creation wizard
+│       │   └── prompts.py       CLI prompt helpers
 │       └── plugins/             Custom check plugins (Python files)
-├── tests/                       Test suite
-├── examples/                    Example configs and usage scripts
+├── tests/                       137 tests — unit, integration, fuzz, performance
 ├── pyproject.toml
 ├── README.md
 └── LICENSE
@@ -255,7 +420,7 @@ gatehouse/                       (repo root)
 
 ## How LibCST Powers the Engine
 
-Gatehouse uses [LibCST](https://github.com/Instagram/LibCST) (Meta's Concrete Syntax Tree library for Python) instead of `ast` or `tokenize`. This is a deliberate architectural choice.
+Gatehouse uses [LibCST](https://github.com/Instagram/LibCST) (Meta's Concrete Syntax Tree library for Python) instead of `ast` or `tokenize`.
 
 ### Why not `ast` or `tokenize`?
 
@@ -265,12 +430,11 @@ LibCST preserves all source detail (comments, whitespace, formatting) while prov
 
 ### One parse, one resolve
 
-`SourceAnalyzer` creates exactly one parse tree and one metadata resolution per file. All 12 rules query the same object:
+`SourceAnalyzer` creates exactly one parse tree and one metadata resolution per file. All rules query the same object:
 
 ```python
 analyzer = SourceAnalyzer(source, filepath)
 
-# Rules call methods like:
 analyzer.has_main_guard()                          # CST If node matching
 analyzer.header_comments()                         # Module.header EmptyLine nodes
 analyzer.literals_in_function_bodies(safe, ctx)    # Scope-aware literal detection
@@ -295,6 +459,16 @@ With `ast`, this required hacking `_parent` attributes onto every node and walki
 Negative numbers like `-1` in CST are `UnaryOperation(Minus, Integer("1"))` — a separate node type that the old `ast`-based code didn't handle. The LibCST implementation unwraps these explicitly, fixing the bug where `safe_values: [-1]` was silently ignored.
 
 Boolean values `True`/`False` are `Name` nodes in CST (not literals), and the type-aware safe value check prevents `True == 1` from colliding with `safe_values: [1]`.
+
+---
+
+## Zero Hardcoded Values
+
+Gatehouse enforces the "no hardcoded values" rule on itself.
+
+Every internal constant, label, message template, exit code, file extension, and formatting string lives in `config/defaults.yaml`. Source modules access values through `lib/config.get()` with typed accessors. No string literal in a function body refers to a configurable value.
+
+This means the entire Gatehouse behaviour can be audited or overridden from a single YAML file.
 
 ---
 
@@ -359,6 +533,12 @@ rules:
   - id: "no-todo-comments"
 ```
 
+Validate all rules:
+
+```bash
+gatehouse lint-rules
+```
+
 ### Check types
 
 | Type | What It Does |
@@ -370,9 +550,13 @@ rules:
 | `uppercase_assignments_exist` | Module-level UPPER_SNAKE_CASE constant count |
 | `docstring_contains` | Required text in module docstring |
 | `file_metric` | Line count threshold |
-| `custom` | Inline Python expression or external plugin file |
+| `custom` | External plugin file (runs in-process; subprocess isolation planned for v0.4) |
 
 Despite the legacy names (`ast_check`, `token_scan`), all check types use LibCST internally. The names are kept for backward compatibility with existing rule YAML files.
+
+### Plugin trust model
+
+Plugins are loaded only from `gate_home/plugins/`. They execute in the same process with the contract `def check(analyzer) -> list[dict]`. Failed plugins raise `PluginError` with the rule ID and underlying exception. Subprocess isolation is planned for v0.4.0.
 
 ---
 
@@ -382,7 +566,7 @@ Scans are logged to `logs/gate/violations.jsonl` (when logging is enabled in `.g
 
 ```json
 {
-  "timestamp": "2026-02-15T14:57:00Z",
+  "timestamp": "2026-02-16T14:57:00Z",
   "file": "src/train.py",
   "schema": "production",
   "status": "rejected",

@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/lib/scope.py
+# hypothesis_version: 6.151.8
+
+['*', 'defaults.schema_name', 'exempt_files', 'exempt_paths', 'gated_paths', 'overrides', 'schema', 'scope']

@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/_paths.py
+# hypothesis_version: 6.151.8
+
+['Path | None', 'config', 'directories.cli', 'directories.plugins', 'directories.rules', 'directories.schemas', 'env_vars.gate_home', 'filenames.theme']

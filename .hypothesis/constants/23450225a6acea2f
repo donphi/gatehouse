@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/.venv/bin/pytest
+# hypothesis_version: 6.151.8
+
+['__main__']

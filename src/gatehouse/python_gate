@@ -25,14 +25,14 @@ if [[ "$MODE" != "hard" && "$MODE" != "soft" ]]; then
 fi
 
 # Gate home: try explicit override, then script directory, then Python module discovery
-if [[ -n "${GATE_HOME:-}" ]] && [[ -f "${GATE_HOME}/gate_engine.py" ]]; then
+if [[ -n "${GATE_HOME:-}" ]] && [[ -f "${GATE_HOME}/engine.py" ]]; then
     : # Use explicit GATE_HOME — user override takes priority
-elif [[ -f "${SCRIPT_DIR}/gate_engine.py" ]]; then
+elif [[ -f "${SCRIPT_DIR}/engine.py" ]]; then
     GATE_HOME="$SCRIPT_DIR"  # Dev / source checkout — engine is next to interceptor
 else
-    # pip install: gate_engine.py lives in site-packages/gatehouse/, not next to python_gate.
+    # pip install: engine.py lives in site-packages/gatehouse/, not next to python_gate.
     # Ask the same Python interpreter to locate the installed package.
-    GATE_HOME=$($REAL_PYTHON -c "import os, gatehouse.gate_engine as ge; print(os.path.dirname(os.path.abspath(ge.__file__)))" 2>/dev/null)
+    GATE_HOME=$($REAL_PYTHON -c "import os, gatehouse.engine as ge; print(os.path.dirname(os.path.abspath(ge.__file__)))" 2>/dev/null)
 fi
 
 # Export so gate_engine.py receives the same home directory we discovered.
@@ -52,7 +52,7 @@ esac
 # We check the file exists to confirm GATE_HOME is valid, but we invoke
 # via -m so that Python resolves the package correctly (__package__ is set,
 # all relative and absolute package imports work reliably).
-GATE_ENGINE="${GATE_HOME}/gate_engine.py"
+GATE_ENGINE="${GATE_HOME}/engine.py"
 
 # Find the .py file in the command arguments
 PY_FILE=""
@@ -106,7 +106,11 @@ fi
 # Run the gate engine to check the code
 # --no-scope: python_gate intercepted an explicit python invocation, so skip
 # gated_paths filtering — the user asked to run this file, enforce it.
-GATE_OUTPUT=$($REAL_PYTHON -m gatehouse.gate_engine --file "$PY_FILE" --schema "$SCHEMA" --no-scope 2>&1)
+# Mark file as scanned by the outer shim so the inner import hook
+# (gatehouse.auto) skips it — prevents double-scanning.
+export GATEHOUSE_OUTER_VERDICT="${GATEHOUSE_OUTER_VERDICT:+${GATEHOUSE_OUTER_VERDICT}:}$(realpath "$PY_FILE")"
+
+GATE_OUTPUT=$($REAL_PYTHON -m gatehouse.engine --file "$PY_FILE" --schema "$SCHEMA" --no-scope 2>&1)
 GATE_EXIT=$?
 
 # If violations were found, print the gate output to stderr

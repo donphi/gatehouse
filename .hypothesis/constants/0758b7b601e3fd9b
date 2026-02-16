@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/exceptions.py
+# hypothesis_version: 6.151.8
+
+['fix', 'line', 'message', 'messages.fix_prefix', 'messages.parse_error', 'violation']

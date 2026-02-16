@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/cli/prompts.py
+# hypothesis_version: 6.151.8
+
+['\'"', ',', ': ', 'colors.error', 'dim', 'label', 'red', 'value']

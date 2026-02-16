@@ -1,1 +1,1 @@
-"""Gatehouse rules — YAML rule definitions for code schema enforcement."""
+"""Gatehouse rules — YAML rule definitions for individual code checks."""

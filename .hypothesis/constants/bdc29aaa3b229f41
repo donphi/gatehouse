@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/lib/logger.py
+# hypothesis_version: 6.151.8
+
+['a', 'code_hash', 'code_length_lines', 'event', 'file', 'filenames.scan_log', 'iteration', 'passed_rules', 'scan', 'scan_ms', 'schema', 'schema_version', 'status', 'timestamp', 'total_rules', 'utf-8', 'violations']

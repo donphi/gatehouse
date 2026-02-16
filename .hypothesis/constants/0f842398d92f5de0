@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/lib/config.py
+# hypothesis_version: 6.151.8
+
+['.', 'config', 'defaults.yaml', 'utf-8']

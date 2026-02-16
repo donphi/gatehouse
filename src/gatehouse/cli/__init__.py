@@ -1,1 +1,1 @@
-"""Gatehouse CLI — Config-driven interactive rule builder."""
+"""Gatehouse CLI — command-line interface for rule management and enforcement."""

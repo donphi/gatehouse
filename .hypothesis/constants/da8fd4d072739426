@@ -1,0 +1,4 @@
+# file: /mnt/nvme8tb-1/code/shim/src/gatehouse/engine.py
+# hypothesis_version: 6.151.8
+
+[1000, '--file', '--filename', '--format', '--no-scope', '--schema', '--stdin', '--version', 'Output format', 'Read code from stdin', '__main__', 'defaults.error_line', 'defaults.json_indent', 'directory', 'enabled', 'error', 'exit_codes.blocked', 'exit_codes.error', 'exit_codes.ok', 'fix', 'formats.default', 'formats.json', 'formats.stderr', 'id', 'line', 'logging', 'message', 'r', 'rule', 'rule_data', 'schema', 'severities.block', 'severities.off', 'severities.warn', 'severity', 'source', 'statuses.passed', 'statuses.rejected', 'store_true', 'utf-8', 'version']
