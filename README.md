@@ -1,10 +1,18 @@
-# Gatehouse
+<div align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset=".github/assets/gatehouse-banner-dark.svg">
+    <source media="(prefers-color-scheme: light)" srcset=".github/assets/gatehouse-banner-light.svg">
+    <img alt="Gatehouse" src="https://raw.githubusercontent.com/donphi/gatehouse/main/.github/assets/gatehouse-banner-dark.svg" width="720">
+  </picture>
 
-[![PyPI version](https://img.shields.io/pypi/v/gatehouse.svg)](https://pypi.org/project/gatehouse/)
-[![Python versions](https://img.shields.io/pypi/pyversions/gatehouse.svg)](https://pypi.org/project/gatehouse/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  <br>
 
-**Execution-time code schema enforcement for Python.**
+  [![PyPI version](https://img.shields.io/pypi/v/gatehouse.svg)](https://pypi.org/project/gatehouse/)
+  [![Python versions](https://img.shields.io/pypi/pyversions/gatehouse.svg)](https://pypi.org/project/gatehouse/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
+  **Execution-time code schema enforcement for Python.**
+</div>
 
 <!-- TODO: Replace with terminal recording gif -->
 <p align="center">
