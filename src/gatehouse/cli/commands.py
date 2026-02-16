@@ -138,6 +138,7 @@ def cmd_list_rules(args: argparse.Namespace) -> None:
         args: Parsed CLI arguments.  Uses ``args.schema`` for optional filter.
     """
     rd = _rules_dir()
+    hline = config.get_str("formatting.horizontal_line_char")
     ext = config.get_str("filenames.rule_extension")
     err_color = config.get_str("colors.error")
     default_severity = config.get_str("defaults.severity")
@@ -157,7 +158,7 @@ def cmd_list_rules(args: argparse.Namespace) -> None:
             sys.exit(1)
 
         print(f"\nRules in schema '{args.schema}':")
-        print(f"{'\u2500' * sep_w}")
+        print(f"{hline * sep_w}")
 
         rules_list = schema_data.get("rules", [])
         for entry in rules_list:
@@ -193,7 +194,7 @@ def cmd_list_rules(args: argparse.Namespace) -> None:
             return
 
         print(f"\nAvailable rules ({rd}):")
-        print(f"{'\u2500' * sep_w}")
+        print(f"{hline * sep_w}")
 
         for filename in sorted(os.listdir(rd)):
             if not filename.endswith(ext):
@@ -394,6 +395,7 @@ def _print_verbose_status(
         ext: Rule/schema file extension.
     """
     sep_w = config.get_int("formatting.status_separator_width")
+    hline = config.get_str("formatting.horizontal_line_char")
     ok_color = config.get_str("colors.success")
 
     print(f"\n  {_color('Resolved Rules:', 'bold')}")
@@ -431,7 +433,7 @@ def _print_verbose_status(
     else:
         print(f"    {_color('(schemas dir missing)', 'dim')}")
 
-    print(f"  {'\u2500' * sep_w}")
+    print(f"  {hline * sep_w}")
 
 
 def cmd_status(args: argparse.Namespace) -> None:
@@ -453,6 +455,7 @@ def cmd_status(args: argparse.Namespace) -> None:
     project_cfg_name = config.get_str("filenames.project_config")
     ext = config.get_str("filenames.schema_extension")
     sep_w = config.get_int("formatting.status_separator_width")
+    hline = config.get_str("formatting.horizontal_line_char")
     lbl_header = config.get_str("labels.status_header")
     lbl_found = config.get_str("labels.found")
     lbl_not_found = config.get_str("labels.not_found")
@@ -471,7 +474,7 @@ def cmd_status(args: argparse.Namespace) -> None:
 
     print()
     print(f"  {_color(lbl_header, 'bold')}")
-    print(f"  {'\u2500' * sep_w}")
+    print(f"  {hline * sep_w}")
     print(f"  Mode:      {_color(ml[mode], mc[mode])}")
     home_source = home_auto if not os.environ.get(env_gate_home) else home_env
     print(f"  Home:      {_color(gate_home, 'cyan')} {home_source}")
@@ -522,7 +525,7 @@ def cmd_status(args: argparse.Namespace) -> None:
             f"{_color(f'no {project_cfg_name} in current directory', 'dim')}"
         )
 
-    print(f"  {'\u2500' * sep_w}")
+    print(f"  {hline * sep_w}")
 
     if getattr(args, "verbose", False):
         _print_verbose_status(rd, sd, ext)

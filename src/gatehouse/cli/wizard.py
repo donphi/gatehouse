@@ -67,9 +67,10 @@ def print_banner(branding: dict[str, Any], color_config: dict[str, Any]) -> None
     title_lines = [line for line in title.strip().splitlines() if line.strip()]
     max_width = max(len(line) for line in title_lines) if title_lines else fallback_w
     box_width = max(max_width + 4, min_w)
+    dbl = config.get_str("formatting.double_horizontal_char")
 
     print()
-    print(_color(f"  \u2554{'\u2550' * box_width}\u2557", border_color))
+    print(_color(f"  \u2554{dbl * box_width}\u2557", border_color))
     print(_color(f"  \u2551{' ' * box_width}\u2551", border_color))
 
     for line in title_lines:
@@ -100,7 +101,7 @@ def print_banner(branding: dict[str, Any], color_config: dict[str, Any]) -> None
         )
 
     print(_color(f"  \u2551{' ' * box_width}\u2551", border_color))
-    print(_color(f"  \u255a{'\u2550' * box_width}\u255d", border_color))
+    print(_color(f"  \u255a{dbl * box_width}\u255d", border_color))
     print()
 
 

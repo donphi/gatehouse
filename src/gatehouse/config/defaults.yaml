@@ -69,6 +69,8 @@ exit_codes:
 formatting:
   summary_bar_width: 62
   summary_bar_char: "\u2501"
+  horizontal_line_char: "\u2500"
+  double_horizontal_char: "\u2550"
   prompt_box_width: 61
   status_separator_width: 56
   rule_list_separator_width: 60
