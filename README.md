@@ -2,7 +2,7 @@
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset=".github/assets/gatehouse-banner-dark.svg">
     <source media="(prefers-color-scheme: light)" srcset=".github/assets/gatehouse-banner-light.svg">
-    <img alt="Gatehouse" src="https://raw.githubusercontent.com/donphi/gatehouse/main/.github/assets/gatehouse-banner-dark.svg" width="720">
+    <img alt="Gatehouse" src="https://raw.githubusercontent.com/donphi/gatehouse/main/.github/assets/gatehouse-banner-dark.svg" width="800">
   </picture>
 
   <br>
