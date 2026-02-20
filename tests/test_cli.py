@@ -8,6 +8,7 @@ from pathlib import Path
 
 import pytest
 
+import gatehouse
 
 CLI_MODULE = "gatehouse.cli.main"
 PYTHON = sys.executable
@@ -36,7 +37,7 @@ class TestCLIEntryPoint:
             timeout=10,
         )
         assert result.returncode == 0
-        assert "0.3.0" in result.stdout
+        assert gatehouse.__version__ in result.stdout
 
     def test_unknown_command(self) -> None:
         """Unknown subcommand prints help (not crash)."""
