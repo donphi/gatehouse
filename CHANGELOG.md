@@ -4,6 +4,14 @@ All notable changes to Gatehouse will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/), and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [0.3.1] - 2026-02-20
+
+### Added
+
+- **Automated publish workflow** (`.github/workflows/publish.yml`) — tag-triggered pipeline that builds sdist + wheel, publishes to TestPyPI, then to production PyPI after manual approval, and creates a GitHub Release with changelog body and downloadable assets
+- **OIDC trusted publishing** — keyless authentication to both PyPI and TestPyPI via GitHub's OpenID Connect identity tokens; no API tokens or secrets required
+- **GitHub Release automation** — extracts the relevant section from `CHANGELOG.md` and attaches built distributions as release assets
+
 ## [0.3.0] - 2026-02-16
 
 ### Added

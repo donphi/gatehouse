@@ -13,7 +13,7 @@ Deprecation policy:
     - gatehouse.gate_engine is deprecated; use gatehouse.engine instead.
 """
 
-__version__ = "0.3.0"
+__version__ = "0.3.1"
 
 from gatehouse.engine import ScanResult, Violation, scan_file
 from gatehouse.exceptions import GatehouseViolationError, PluginError
